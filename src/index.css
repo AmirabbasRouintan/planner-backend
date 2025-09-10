@@ -24,6 +24,7 @@
   /* Light theme colors */
   --background: oklch(1.00 0 0);
   --foreground: oklch(0.14 0.00 285.86);
+  --background1: oklch(20.019% 0.00002 271.152);
   --card: oklch(1.00 0 0);
   --card-foreground: oklch(0.14 0.00 285.86);
   --popover: oklch(1.00 0 0);
@@ -53,6 +54,7 @@
   --sidebar-accent-foreground: oklch(0.21 0.01 285.93);
   --sidebar-border: oklch(0.92 0.00 286.61);
   --sidebar-ring: oklch(0.71 0.01 286.09);
+  --calendar-date-bg: #161616; /* Added color variable */
 
   --font-sans: Nunito, sans-serif;
   --font-serif: Source Serif 4, serif;
@@ -86,6 +88,7 @@
 /* Dark theme colors */
 .dark {
   --background: oklch(0.14 0.00 285.86);
+  --background1: oklch(20.019% 0.00002 271.152);
   --foreground: oklch(0.99 0 0);
   --card: oklch(0.21 0.01 285.93);
   --card-foreground: oklch(0.99 0 0);
@@ -116,6 +119,7 @@
   --sidebar-accent-foreground: oklch(0.99 0 0);
   --sidebar-border: oklch(1.00 0 0 / 10%);
   --sidebar-ring: oklch(0.55 0.02 285.93);
+  --calendar-date-bg: #161616; /* Added color variable for dark theme */
   
   --shadow-2xs: 0 1px 13px 0px oklch(0 0 0 / 0.13);
   --shadow-xs: 0 1px 13px 0px oklch(0 0 0 / 0.13);
