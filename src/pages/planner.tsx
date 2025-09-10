@@ -21,11 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent
-} from "@/components/ui/popover";
+import { Popover, PopoverTrigger } from "@/components/ui/popover";
 import {
   Tooltip,
   TooltipContent,
@@ -105,14 +101,48 @@ export default function Planner() {
     }
   }, [events]);
 
-  const handleDateSelect = (d: Date | undefined) => {
-    if (!d) return;
-    if (isDateDisabled(d)) return;
-    setSelected(d);
-  };
+  const handleDateSelect = React.useCallback(
+    (d: Date | undefined) => {
+      if (!d) return;
+      if (isDateDisabled(d)) return;
+      setSelected(d);
+    },
+    [isDateDisabled]
+  );
+
+  // Memoize the currentDate calculation
+  const currentDate = React.useMemo(() => selected || new Date(), [selected]);
+
+  const currentYear = React.useMemo(
+    () => currentDate.getFullYear(),
+    [currentDate]
+  );
+  const currentMonth = React.useMemo(
+    () => currentDate.toLocaleString("default", { month: "long" }),
+    [currentDate]
+  );
+  const daysInMonth = React.useMemo(
+    () =>
+      new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth() + 1,
+        0
+      ).getDate(),
+    [currentDate]
+  );
+
+  const daysArray = React.useMemo(
+    () =>
+      Array.from(
+        { length: daysInMonth },
+        (_, i) =>
+          new Date(currentDate.getFullYear(), currentDate.getMonth(), i + 1)
+      ),
+    [currentDate, daysInMonth]
+  );
 
   // ----- DESCRIPTION save (small drawer / side editor) -----
-  const saveDescription = () => {
+  const saveDescription = React.useCallback(() => {
     if (!selected && !editingKey) return;
     const key = editingKey || (selected ? formatKey(selected) : null);
     if (!key) return;
@@ -131,74 +161,87 @@ export default function Planner() {
     setOpen(false);
     setEditingKey(null);
     setDraftDescription("");
-  };
+  }, [selected, editingKey, draftDescription]);
 
   // ----- NOTE save (fullscreen editor) -----
-  const saveFullNote = (key?: string) => {
-    const k = key || fullEditorOpen;
-    if (!k) return;
+  const saveFullNote = React.useCallback(
+    (key?: string) => {
+      const k = key || fullEditorOpen;
+      if (!k) return;
 
-    setEvents((prev) => ({
-      ...prev,
-      [k]: {
-        ...(prev[k] || {}),
-        date: k,
-        note: fullDraft
-      }
-    }));
+      setEvents((prev) => ({
+        ...prev,
+        [k]: {
+          ...(prev[k] || {}),
+          date: k,
+          note: fullDraft
+        }
+      }));
 
-    setFullEditorOpen(null);
-    setFullDraft("");
-  };
-
-  const deleteEvent = (key: string) => {
-    setEvents((prev) => {
-      const copy = { ...prev };
-      delete copy[key];
-      return copy;
-    });
-
-    if (editingKey === key) {
-      setEditingKey(null);
-      setDraftDescription("");
-      setOpen(false);
-    }
-    if (fullEditorOpen === key) {
       setFullEditorOpen(null);
       setFullDraft("");
-    }
-  };
+    },
+    [fullEditorOpen, fullDraft]
+  );
 
-  const cancelDescriptionEdit = () => {
+  const deleteEvent = React.useCallback(
+    (key: string) => {
+      setEvents((prev) => {
+        const copy = { ...prev };
+        delete copy[key];
+        return copy;
+      });
+
+      if (editingKey === key) {
+        setEditingKey(null);
+        setDraftDescription("");
+        setOpen(false);
+      }
+      if (fullEditorOpen === key) {
+        setFullEditorOpen(null);
+        setFullDraft("");
+      }
+    },
+    [editingKey, fullEditorOpen]
+  );
+
+  const cancelDescriptionEdit = React.useCallback(() => {
     setEditingKey(null);
     setDraftDescription("");
     setOpen(false);
-  };
+  }, []);
 
-  const cancelFull = () => {
+  const cancelFull = React.useCallback(() => {
     setFullEditorOpen(null);
     setFullDraft("");
-  };
+  }, []);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const currentDate = selected || new Date();
-  const currentYear = currentDate.getFullYear();
-  const currentMonth = currentDate.toLocaleString("default", { month: "long" });
-  const daysInMonth = new Date(
-    currentDate.getFullYear(),
-    currentDate.getMonth() + 1,
-    0
-  ).getDate();
+  // Memoize event count for badge
+  const eventCount = React.useMemo(() => Object.keys(events).length, [events]);
 
-  const daysArray = React.useMemo(
-    () =>
-      Array.from(
-        { length: daysInMonth },
-        (_, i) =>
-          new Date(currentDate.getFullYear(), currentDate.getMonth(), i + 1)
-      ),
-    [currentDate, daysInMonth]
-  );
+  // Handler for today button
+  const handleTodayClick = React.useCallback(() => {
+    const today = new Date();
+    const todayKey = formatKey(today);
+    setSelected(today);
+    setDraftDescription(events[todayKey]?.description || "");
+    setEditingKey(todayKey);
+    setOpen(true);
+  }, [events]);
+
+  // Handler for saving from side editor
+  const saveFromSideEditor = React.useCallback(() => {
+    if (!selected) return;
+    const key = formatKey(selected);
+    setEvents((prev) => ({
+      ...prev,
+      [key]: {
+        ...(prev[key] || {}),
+        date: key,
+        description: draftDescription
+      }
+    }));
+  }, [selected, draftDescription]);
 
   return (
     <div className="flex flex-col items-center min-h-screen w-full p-4 gap-4">
@@ -284,17 +327,7 @@ export default function Planner() {
               </DrawerContent>
             </Drawer>
 
-            <Button
-              variant="outline"
-              onClick={() => {
-                // open description editor for today
-                const todayKey = formatKey(new Date());
-                setSelected(new Date());
-                setDraftDescription(events[todayKey]?.description || "");
-                setEditingKey(todayKey);
-                setOpen(true);
-              }}
-            >
+            <Button variant="outline" onClick={handleTodayClick}>
               Today
             </Button>
           </div>
@@ -318,7 +351,7 @@ export default function Planner() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <Badge>{Object.keys(events).length}</Badge>
+                    <Badge>{eventCount}</Badge>
                     <Button
                       variant="outline"
                       size="sm"
@@ -351,7 +384,7 @@ export default function Planner() {
                           ? "ring-1 ring-secondary-foreground"
                           : "hover:shadow"
                       }`}
-                      style={{ backgroundColor: 'var(--calendar-date-bg)' }}
+                      style={{ backgroundColor: "var(--calendar-date-bg)" }}
                       aria-pressed={isSelected}
                     >
                       <div className="w-12 text-center">
@@ -404,11 +437,6 @@ export default function Planner() {
                                     <Edit3Icon className="h-4 w-4" />
                                   </Button>
                                 </PopoverTrigger>
-                                <PopoverContent side="bottom" align="center">
-                                  <div className="text-sm">
-                                    Edit short description
-                                  </div>
-                                </PopoverContent>
                               </Popover>
                             </TooltipTrigger>
                             <TooltipContent>
@@ -513,18 +541,7 @@ export default function Planner() {
                     Reset
                   </Button>
                   <Button
-                    onClick={() => {
-                      if (!selected) return;
-                      const key = formatKey(selected);
-                      setEvents((prev) => ({
-                        ...prev,
-                        [key]: {
-                          ...(prev[key] || {}),
-                          date: key,
-                          description: draftDescription
-                        }
-                      }));
-                    }}
+                    onClick={saveFromSideEditor}
                     disabled={!selected || !draftDescription.trim()}
                   >
                     Save
@@ -568,7 +585,7 @@ export default function Planner() {
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => cancelFull()}
+                  onClick={cancelFull}
                   aria-label="Cancel full editor"
                 >
                   <XIcon className="h-4 w-4" />
