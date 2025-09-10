@@ -303,31 +303,33 @@ export default function Planner() {
         <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
           <aside className="md:col-span-2 border rounded-lg p-3 h-[60vh] md:h-[calc(100vh-12rem)] bg-[var(--calendar-date-bg)]">
             <ScrollArea
-              className="h-full pr-4 pl-1"
+              className="h-full pr-4"
               style={{ scrollbarGutter: "stable" }}
             >
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <div className="text-lg font-medium">
-                    {currentMonth} {currentYear}
+              <div className="sticky top-0 mb-1 z-10 bg-[var(--calendar-date-bg)]">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <div className="text-lg font-medium">
+                      {currentMonth} {currentYear}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Tap a day to select - days with events are highlighted
+                    </div>
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    Tap a day to select - days with events are highlighted
-                  </div>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  <Badge>{Object.keys(events).length}</Badge>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      localStorage.removeItem(STORAGE_KEY);
-                      setEvents({});
-                    }}
-                  >
-                    Clear all
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Badge>{Object.keys(events).length}</Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        localStorage.removeItem(STORAGE_KEY);
+                        setEvents({});
+                      }}
+                    >
+                      Clear all
+                    </Button>
+                  </div>
                 </div>
               </div>
 
