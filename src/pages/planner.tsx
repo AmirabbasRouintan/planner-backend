@@ -11,7 +11,8 @@ import {
   DownloadIcon,
   UploadIcon,
   RotateCcwIcon,
-  SearchIcon
+  SearchIcon,
+  StickyNoteIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -52,18 +53,27 @@ import {
   ResizablePanel,
   ResizablePanelGroup
 } from "@/components/ui/resizable";
-// ----- Data model -----
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
+import { useAuth } from "@/contexts/AuthContext";
+
 interface Reminder {
-  time: string; // e.g., "1day", "2hours", "30minutes"
+  time: string;
   enabled: boolean;
 }
 interface RecurrenceRule {
   frequency: "daily" | "weekly" | "monthly" | "yearly";
   interval: number;
-  endDate?: string; // ISO date
+  endDate?: string;
 }
 interface DayEvent {
-  date: string; // ISO date key (YYYY-MM-DD)
+  date: string;
   description?: string;
   note?: string;
   category?: string;
@@ -95,13 +105,11 @@ const RECURRENCE_OPTIONS = [
   { value: "yearly", label: "Yearly" }
 ];
 
-// FIXED: Added validation to handle invalid dates
 function formatKey(d: Date | string | number) {
   const date = new Date(d);
   return isNaN(date.getTime()) ? "" : date.toISOString().split("T")[0];
 }
 
-// FIXED: Added validation to handle invalid dates
 function formatReadable(d: Date | string | undefined) {
   if (!d) return "";
   const date = typeof d === "string" ? new Date(d) : d;
@@ -132,7 +140,6 @@ function generateRecurringEvents(
       ...baseEvent,
       date: formatKey(currentDate)
     });
-    // Increment date based on recurrence rule
     switch (frequency) {
       case "daily":
         currentDate.setDate(currentDate.getDate() + interval);
@@ -157,7 +164,6 @@ function checkReminders(events: Record<string, DayEvent>) {
     if (event.reminder && event.reminder.enabled) {
       const eventDate = new Date(event.date);
       const reminderTime = new Date(eventDate);
-      // Calculate reminder time based on setting
       switch (event.reminder.time) {
         case "30minutes":
           reminderTime.setMinutes(reminderTime.getMinutes() - 30);
@@ -175,7 +181,6 @@ function checkReminders(events: Record<string, DayEvent>) {
           reminderTime.setDate(reminderTime.getDate() - 2);
           break;
       }
-      // Check if it's time to show the reminder
       if (now >= reminderTime && now < eventDate) {
         if (Notification.permission === "granted") {
           new Notification(`Reminder: ${event.description || "Event"}`, {
@@ -234,11 +239,9 @@ function importEventsFromFile(
       if (file.name.endsWith(".json")) {
         events = JSON.parse(content);
       } else if (file.name.endsWith(".csv")) {
-        // Improved CSV parsing
         const lines = content.split("\n").map(
-          (line) => line.replace(/^"(.*)"$/, "$1") // Remove surrounding quotes if present
+          (line) => line.replace(/^"(.*)"$/, "$1"),
         );
-        // Find column indexes by header name
         const headers = lines[0].split(",");
         const dateIndex = headers.findIndex((h) => h.toLowerCase() === "date");
         const descriptionIndex = headers.findIndex(
@@ -250,21 +253,18 @@ function importEventsFromFile(
         const completedIndex = headers.findIndex(
           (h) => h.toLowerCase() === "completed"
         );
-        // Check if required columns exist
         if (dateIndex === -1 || descriptionIndex === -1) {
           throw new Error("CSV file must contain Date and Description columns");
         }
         for (let i = 1; i < lines.length; i++) {
           if (!lines[i]) continue;
           const values = lines[i].split(",").map(
-            (value) => value.replace(/^"(.*)"$/, "$1") // Remove surrounding quotes
+            (value) => value.replace(/^"(.*)"$/, "$1"),
           );
-          // Ensure we have enough columns
           if (values.length < Math.max(dateIndex, descriptionIndex) + 1) {
             continue;
           }
           const date = values[dateIndex];
-          // Create event only if date is valid
           if (date && !isNaN(new Date(date).getTime())) {
             events[date] = {
               date: date,
@@ -288,16 +288,27 @@ function importEventsFromFile(
   reader.readAsText(file);
 }
 
+interface PermanentNote {
+  id: number;
+  title: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  timestamp?: number;
+}
+
 export default function Planner() {
+  useAuth();
   const [open, setOpen] = React.useState(false);
   const [selected, setSelected] = React.useState<Date | undefined>(new Date());
   const [events, setEvents] = React.useState<Record<string, DayEvent>>({});
+  const [permanentNotes, setPermanentNotes] = React.useState<PermanentNote[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [categoryFilter, setCategoryFilter] = React.useState<string>("all");
   const [dateRangeFilter, setDateRangeFilter] = React.useState<string>("all");
   const [showCompleted, setShowCompleted] = React.useState(true);
 
-  // editing for DESCRIPTION (small drawer + side editor)
+  const [editingEvent, setEditingEvent] = React.useState<DayEvent | null>(null);
   const [editingKey, setEditingKey] = React.useState<string | null>(null);
   const [draftDescription, setDraftDescription] = React.useState("");
   const [draftCategory, setDraftCategory] = React.useState("_none_");
@@ -305,29 +316,31 @@ export default function Planner() {
   const [draftRecurrence, setDraftRecurrence] = React.useState("none");
   const [draftCompleted, setDraftCompleted] = React.useState(false);
 
-  // fullscreen editor state for NOTE (separate from description)
+  const [noteEditorOpen, setNoteEditorOpen] = React.useState(false);
   const [fullEditorOpen, setFullEditorOpen] = React.useState<string | null>(
     null
   );
   const [fullDraft, setFullDraft] = React.useState("");
   const [markdownPreview, setMarkdownPreview] = React.useState(false);
 
-  // FIXED: Changed to include current year so Today button works
+  const [notePopupOpen, setNotePopupOpen] = React.useState(false);
+  const [quickNote, setQuickNote] = React.useState("");
+  const [notePreviewMode, setNotePreviewMode] = React.useState(true);
+
   const minDate = React.useMemo(() => {
     const date = new Date();
-    date.setFullYear(date.getFullYear() - 1); // Allow dates from 1 year ago
+    date.setFullYear(date.getFullYear() - 1);
     date.setHours(0, 0, 0, 0);
     return date;
   }, []);
 
   const maxDate = React.useMemo(() => {
     const date = new Date();
-    date.setFullYear(date.getFullYear() + 5); // Allow dates up to 5 years in future
+    date.setFullYear(date.getFullYear() + 5);
     date.setHours(0, 0, 0, 0);
     return date;
   }, []);
 
-  // FIXED: Added clampDate function to ensure dates stay within range
   const clampDate = React.useCallback(
     (date: Date) => {
       return new Date(
@@ -342,7 +355,6 @@ export default function Planner() {
     [minDate, maxDate]
   );
 
-  // FIXED: Updated to use clampDate and handle invalid dates
   const handleDateSelect = React.useCallback(
     (d: Date | undefined) => {
       if (!d || isNaN(d.getTime())) return;
@@ -352,7 +364,6 @@ export default function Planner() {
     [clampDate]
   );
 
-  // Load events from localStorage
   React.useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -361,7 +372,7 @@ export default function Planner() {
         setEvents(parsed || {});
       }
 
-      // FIXED: Initialize selected date to a valid date within range
+      const initialDate = new Date();
       setSelected(clampDate(new Date()));
     } catch (e) {
       console.warn("Failed to load planner events", e);
@@ -369,7 +380,18 @@ export default function Planner() {
     }
   }, [clampDate]);
 
-  // Save events to localStorage
+  React.useEffect(() => {
+    try {
+      const savedNotes = localStorage.getItem('permanent-notes');
+      if (savedNotes) {
+        const notes = JSON.parse(savedNotes);
+        setPermanentNotes(notes);
+      }
+    } catch (error) {
+      console.error('Error loading notes from localStorage:', error);
+    }
+  }, []);
+
   React.useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
@@ -378,22 +400,17 @@ export default function Planner() {
     }
   }, [events]);
 
-  // Check for reminders periodically
   React.useEffect(() => {
-    // Request notification permission
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }
-    // Check reminders every minute
     const interval = setInterval(() => {
       checkReminders(events);
     }, 60000);
-    // Initial check
     checkReminders(events);
     return () => clearInterval(interval);
   }, [events]);
 
-  // FIXED: Added null check for selected
   const currentDate = React.useMemo(
     () => selected || clampDate(new Date()),
     [selected, clampDate]
@@ -425,10 +442,8 @@ export default function Planner() {
     [currentDate, daysInMonth]
   );
 
-  // Filter events based on search, category, and date range
   const filteredEvents = React.useMemo(() => {
     let filtered = { ...events };
-    // Apply search filter
     if (searchQuery) {
       filtered = Object.fromEntries(
         Object.entries(events).filter(
@@ -440,7 +455,6 @@ export default function Planner() {
         )
       );
     }
-    // Apply category filter
     if (categoryFilter !== "all") {
       filtered = Object.fromEntries(
         Object.entries(filtered).filter(
@@ -448,20 +462,17 @@ export default function Planner() {
         )
       );
     }
-    // Apply completed filter
     if (!showCompleted) {
       filtered = Object.fromEntries(
         Object.entries(filtered).filter(([, event]) => !event.completed)
       );
     }
-    // Apply date range filter
     if (dateRangeFilter !== "all") {
       const today = new Date();
       const startDate = new Date(today);
       const endDate = new Date(today);
       switch (dateRangeFilter) {
         case "today":
-          // Just today
           break;
         case "week":
           endDate.setDate(today.getDate() + 7);
@@ -493,13 +504,10 @@ export default function Planner() {
     return filtered;
   }, [events, searchQuery, categoryFilter, dateRangeFilter, showCompleted]);
 
-  // Generate recurring events for display
   const eventsWithRecurrence = React.useMemo(() => {
     const allEvents = { ...events };
     const endDate = new Date();
     endDate.setFullYear(endDate.getFullYear() + 1);
-    endDate.setFullYear(endDate.getFullYear() + 1); // Show recurring events for next year
-    // Generate recurring events
     Object.values(events).forEach((event) => {
       if (event.recurrence) {
         const recurringEvents = generateRecurringEvents(event, endDate);
@@ -516,11 +524,14 @@ export default function Planner() {
     return allEvents;
   }, [events]);
 
-  // Get events for the current view (with filters applied)
-  const viewEvents =
-    dateRangeFilter === "all" ? eventsWithRecurrence : filteredEvents;
+  const viewEvents = React.useMemo(() => {
+    return dateRangeFilter === "all" ? eventsWithRecurrence : filteredEvents;
+  }, [dateRangeFilter, eventsWithRecurrence, filteredEvents]);
 
-  // ----- DESCRIPTION save (small drawer / side editor) -----
+  const currentEvents = React.useMemo(() => {
+    return viewEvents;
+  }, [viewEvents]);
+
   const saveDescription = React.useCallback(() => {
     if (!selected && !editingKey) return;
     const key = editingKey || (selected ? formatKey(selected) : null);
@@ -531,10 +542,9 @@ export default function Planner() {
       description: draftDescription,
       category: draftCategory !== "_none_" ? draftCategory : undefined,
       completed: draftCompleted,
-      note: events[key]?.note // Preserve existing note
+      note: events[key]?.note
     };
 
-    // Add reminder if set
     if (draftReminder !== "_none_") {
       eventData.reminder = {
         time: draftReminder,
@@ -542,7 +552,6 @@ export default function Planner() {
       };
     }
 
-    // Add recurrence if set
     if (draftRecurrence !== "none") {
       eventData.recurrence = {
         frequency: draftRecurrence as "daily" | "weekly" | "monthly" | "yearly",
@@ -555,7 +564,6 @@ export default function Planner() {
       [key]: eventData
     }));
 
-    // clear small editor state
     setOpen(false);
     setEditingKey(null);
     setDraftDescription("");
@@ -574,7 +582,6 @@ export default function Planner() {
     events
   ]);
 
-  // ----- NOTE save (fullscreen editor) -----
   const saveFullNote = React.useCallback(
     (key?: string) => {
       const k = key || fullEditorOpen;
@@ -593,6 +600,78 @@ export default function Planner() {
     },
     [fullEditorOpen, fullDraft]
   );
+
+  const handleSaveNote = React.useCallback(async () => {
+    if (!quickNote.trim()) return;
+    
+    saveNoteLocally();
+    
+    setQuickNote("");
+    setNotePopupOpen(false);
+  }, [quickNote]);
+
+  const saveNoteLocally = React.useCallback(() => {
+    const noteKey = `note_${Date.now()}`;
+    const noteDate = formatKey(new Date());
+    
+    setEvents((prev) => ({
+      ...prev,
+      [noteKey]: {
+        date: noteDate,
+        description: quickNote.trim(),
+        category: "note",
+        note: quickNote.trim()
+      }
+    }));
+    
+    try {
+      const newNote = {
+        id: noteKey,
+        title: 'Permanent Note',
+        content: quickNote.trim(),
+        date: noteDate,
+        timestamp: Date.now()
+      };
+      
+      const existingNotes = JSON.parse(localStorage.getItem('permanent-notes') || '[]');
+      const updatedNotes = [newNote, ...existingNotes];
+      localStorage.setItem('permanent-notes', JSON.stringify(updatedNotes));
+      
+      setPermanentNotes(updatedNotes);
+    } catch (error) {
+      console.error('Error saving note to localStorage:', error);
+    }
+  }, [quickNote]);
+
+  const applyFormatting = React.useCallback((prefix: string, suffix: string) => {
+    const textarea = document.getElementById('quick-note') as HTMLTextAreaElement;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = quickNote.substring(start, end);
+    let cursorPos = textarea.selectionStart;
+
+    if (selectedText) {
+      const newText = quickNote.substring(0, start) + prefix + selectedText + suffix + quickNote.substring(end);
+      setQuickNote(newText);
+    } else {
+      cursorPos = textarea.selectionStart;
+      const textBefore = quickNote.substring(0, cursorPos);
+      const textAfter = quickNote.substring(cursorPos);
+      setQuickNote(textBefore + prefix + suffix + textAfter);
+    }
+    
+    textarea.focus();
+    setTimeout(() => {
+      textarea.focus();
+      if (selectedText) {
+        textarea.setSelectionRange(start, end + prefix.length + suffix.length);
+      } else {
+        textarea.setSelectionRange(cursorPos + prefix.length, cursorPos + prefix.length);
+      }
+    }, 0);
+  }, [quickNote]);
 
   const deleteEvent = React.useCallback(
     (key: string) => {
@@ -630,13 +709,11 @@ export default function Planner() {
     setMarkdownPreview(false);
   }, []);
 
-  // Memoize event count for badge
   const eventCount = React.useMemo(
     () => Object.keys(viewEvents).length,
     [viewEvents]
   );
 
-  // Handler for today button
   const handleTodayClick = React.useCallback(() => {
     const today = new Date();
     const clampedToday = clampDate(today);
@@ -654,7 +731,6 @@ export default function Planner() {
     setOpen(true);
   }, [events, clampDate]);
 
-  // Handler for saving from side editor
   const saveFromSideEditor = React.useCallback(() => {
     if (!selected) return;
     const key = formatKey(selected);
@@ -664,10 +740,9 @@ export default function Planner() {
       description: draftDescription,
       category: draftCategory !== "_none_" ? draftCategory : undefined,
       completed: draftCompleted,
-      note: events[key]?.note // Preserve existing note
+      note: events[key]?.note
     };
 
-    // Add reminder if set
     if (draftReminder !== "_none_") {
       eventData.reminder = {
         time: draftReminder,
@@ -688,7 +763,6 @@ export default function Planner() {
     events
   ]);
 
-  // Toggle event completion
   const toggleCompletion = React.useCallback((key: string) => {
     setEvents((prev) => ({
       ...prev,
@@ -699,7 +773,6 @@ export default function Planner() {
     }));
   }, []);
 
-  // Handle file import
   const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -716,16 +789,16 @@ export default function Planner() {
   };
 
   return (
-    <div className="flex flex-col items-center min-h-screen w-full p-4 gap-4 pb-20 md:pb-16">
+    <div className="flex flex-col items-center min-h-screen w-full p-3 sm:p-4 gap-3 sm:gap-4 pb-20 md:pb-16">
       <div className="w-full max-w-7xl">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div>
-            <h1 className="text-2xl font-semibold">Planner</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="text-xl sm:text-2xl font-semibold">Planner</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">
               Quickly add and manage events :3
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
             <Label htmlFor="date" className="sr-only">
               Select date
             </Label>
@@ -734,23 +807,23 @@ export default function Planner() {
                 <Button
                   id="date"
                   variant="outline"
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 px-3 py-2 text-sm"
                   aria-haspopup="dialog"
                 >
-                  <CalendarPlusIcon />
+                  <CalendarPlusIcon className="h-4 w-4" />
                   <span className="hidden sm:inline">
                     {selected ? selected.toLocaleDateString() : "Choose date"}
                   </span>
                 </Button>
               </DrawerTrigger>
-              <DrawerContent className="w-full max-w-md p-0 mx-auto border">
-                <DrawerHeader className="text-left px-4 pt-4">
-                  <DrawerTitle className="text-lg">
+              <DrawerContent className="w-full max-w-md p-0 mx-auto border max-h-[85vh]">
+                <DrawerHeader className="text-left px-3 sm:px-4 pt-3 sm:pt-4">
+                  <DrawerTitle className="text-base sm:text-lg">
                     {editingKey ? "Edit Event" : "Add Event"}
                   </DrawerTitle>
                 </DrawerHeader>
                 
-                <div className="px-4"> {/* Increased pb to ensure content doesn't overlap with buttons */}
+                <div className="px-3 sm:px-4 pb-20"> {/* Increased pb to ensure content doesn't overlap with buttons */}
                   <Calendar
                     mode="single"
                     selected={selected}
@@ -762,9 +835,9 @@ export default function Planner() {
                     className="mx-auto [--cell-size:clamp(28px,calc(100vw/9),48px)]"
                   />
                   
-                  <div className="mt-4 space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="description">Description</Label>
+                  <div className="mt-3 sm:mt-4 space-y-3 sm:space-y-4">
+                    <div className="space-y-1 sm:space-y-2">
+                      <Label htmlFor="description" className="text-sm sm:text-base">Description</Label>
                       <Textarea
                         id="description"
                         placeholder={`What will you do on ${
@@ -774,8 +847,8 @@ export default function Planner() {
                         }?`}
                         value={draftDescription}
                         onChange={(e) => setDraftDescription(e.target.value)}
-                        rows={3}
-                        className="w-full"
+                        rows={2}
+                        className="w-full text-sm"
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && (e.ctrlKey || e.metaKey))
                             saveDescription();
@@ -784,14 +857,14 @@ export default function Planner() {
                       />
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="category">Category</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                      <div className="space-y-1 sm:space-y-2">
+                        <Label htmlFor="category" className="text-sm sm:text-base">Category</Label>
                         <Select
                           value={draftCategory}
                           onValueChange={setDraftCategory}
                         >
-                          <SelectTrigger id="category">
+                          <SelectTrigger id="category" className="text-sm">
                             <SelectValue placeholder="Select category" />
                           </SelectTrigger>
                           <SelectContent>
@@ -803,7 +876,7 @@ export default function Planner() {
                                     className="w-3 h-3 rounded-full"
                                     style={{ backgroundColor: category.color }}
                                   />
-                                  {category.name}
+                                  <span className="text-sm">{category.name}</span>
                                 </div>
                               </SelectItem>
                             ))}
@@ -811,20 +884,20 @@ export default function Planner() {
                         </Select>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="reminder">Reminder</Label>
+                      <div className="space-y-1 sm:space-y-2">
+                        <Label htmlFor="reminder" className="text-sm sm:text-base">Reminder</Label>
                         <Select
                           value={draftReminder}
                           onValueChange={setDraftReminder}
                         >
-                          <SelectTrigger id="reminder">
+                          <SelectTrigger id="reminder" className="text-sm">
                             <SelectValue placeholder="No reminder" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="_none_">None</SelectItem>
                             {REMINDER_OPTIONS.map((option) => (
                               <SelectItem key={option.value} value={option.value}>
-                                {option.label}
+                                <span className="text-sm">{option.label}</span>
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -832,27 +905,27 @@ export default function Planner() {
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="recurrence">Recurrence</Label>
+                    <div className="space-y-1 sm:space-y-2">
+                      <Label htmlFor="recurrence" className="text-sm sm:text-base">Recurrence</Label>
                       <Select
                         value={draftRecurrence}
                         onValueChange={setDraftRecurrence}
                       >
-                        <SelectTrigger id="recurrence">
+                        <SelectTrigger id="recurrence" className="text-sm">
                           <SelectValue placeholder="Does not repeat" />
                         </SelectTrigger>
                         <SelectContent className="max-h-40 overflow-y-auto">
                           <SelectItem value="none">Does not repeat</SelectItem>
                           {RECURRENCE_OPTIONS.slice(1).map((option) => (
                             <SelectItem key={option.value} value={option.value}>
-                              {option.label}
+                              <span className="text-sm">{option.label}</span>
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
 
-                    <div className="space-y-2 pt-2">
+                    <div className="space-y-1 sm:space-y-2 pt-1 sm:pt-2">
                       <div className="flex items-center space-x-2">
                         <Checkbox
                           id="completed"
@@ -861,7 +934,7 @@ export default function Planner() {
                             setDraftCompleted(checked === true)
                           }
                         />
-                        <Label htmlFor="completed" className="cursor-pointer">
+                        <Label htmlFor="completed" className="cursor-pointer text-sm sm:text-base">
                           Mark as completed
                         </Label>
                       </div>
@@ -874,15 +947,16 @@ export default function Planner() {
                 </div>
                 
                 {/* Fixed button area at the bottom */}
-                <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border p-4 w-full max-w-md mx-auto">
+                <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border p-3 sm:p-4 w-full max-w-md mx-auto">
                   <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={cancelDescriptionEdit}>
+                    <Button variant="outline" onClick={cancelDescriptionEdit} className="text-sm sm:text-base">
                       <XIcon className="h-4 w-4" />
                       <span className="ml-2">Cancel</span>
                     </Button>
                     <Button
                       onClick={saveDescription}
                       disabled={!draftDescription.trim()}
+                      className="text-sm sm:text-base"
                     >
                       <SaveIcon className="h-4 w-4" />
                       <span className="ml-2">Save</span>
@@ -932,6 +1006,15 @@ export default function Planner() {
                   className="hidden"
                 />
               </Label>
+            </Button>
+            {/* Note button */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setNotePopupOpen(true)}
+              title="Add Note"
+            >
+              <StickyNoteIcon className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -991,27 +1074,28 @@ export default function Planner() {
             </Button>
           </div>
         </div>
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <aside className="md:col-span-2 border rounded-lg p-3 h-[50vh] md:h-[calc(100vh-16rem)] bg-[var(--calendar-date-bg)]">
+        <div className="mt-4 sm:mt-6 grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+          <aside className="lg:col-span-2 border rounded-lg p-2 sm:p-3 h-[50vh] sm:h-[calc(100vh-16rem)] bg-[var(--calendar-date-bg)]">
             <ScrollArea
               className="h-full pr-4"
               style={{ scrollbarGutter: "stable" }}
             >
               <div className="sticky top-0 mb-1 z-10 bg-[var(--calendar-date-bg)]">
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-2 sm:gap-0">
                   <div>
-                    <div className="text-lg font-medium">
+                    <div className="text-base sm:text-lg font-medium">
                       {currentMonth} {currentYear}
                     </div>
-                    <div className="text-sm text-muted-foreground">
+                    <div className="text-xs sm:text-sm text-muted-foreground">
                       Tap a day to select - days with events are highlighted
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge>{eventCount}</Badge>
+                    <Badge className="text-xs sm:text-sm">{eventCount}</Badge>
                     <Button
                       variant="outline"
                       size="sm"
+                      className="text-xs sm:text-sm px-2 sm:px-3"
                       onClick={() => {
                         if (
                           window.confirm(
@@ -1042,9 +1126,8 @@ export default function Planner() {
                       onKeyDown={(e) =>
                         e.key === "Enter" && handleDateSelect(day)
                       }
-                      // FIXED: Changed to use handleDateSelect instead of setSelected directly
                       onClick={() => handleDateSelect(day)}
-                      className={`flex items-center gap-3 p-2 mx-1 rounded-lg cursor-pointer transition-shadow ${
+                      className={`flex items-center gap-2 sm:gap-3 p-2 mx-1 rounded-lg cursor-pointer transition-shadow ${
                         isSelected
                           ? "ring-1 ring-secondary-foreground"
                           : "hover:shadow"
@@ -1052,9 +1135,9 @@ export default function Planner() {
                       style={{ backgroundColor: "var(--calendar-date-bg)" }}
                       aria-pressed={isSelected}
                     >
-                      <div className="w-12 text-center">
+                      <div className="w-10 sm:w-12 text-center flex-shrink-0">
                         <div
-                          className={`text-lg font-semibold ${
+                          className={`text-base sm:text-lg font-semibold ${
                             isToday ? "text-blue-600" : ""
                           }`}
                         >
@@ -1064,7 +1147,7 @@ export default function Planner() {
                           {day.toLocaleString(undefined, { weekday: "short" })}
                         </div>
                       </div>
-                      <Separator orientation="vertical" className="h-8" />
+                      <Separator orientation="vertical" className="h-6 sm:h-8" />
                       <div className="flex-1 min-w-0">
                         <div
                           className={`text-sm font-medium truncate ${
@@ -1083,7 +1166,7 @@ export default function Planner() {
                             {evt.category && (
                               <Badge
                                 variant="outline"
-                                className="text-xs py-0 px-1.5"
+                                className="text-xs py-0 px-1"
                                 style={{
                                   backgroundColor: `${
                                     CATEGORIES[
@@ -1107,15 +1190,15 @@ export default function Planner() {
                                 }
                               </Badge>
                             )}
-                            {evt.note && <Badge variant="outline" className="text-xs py-0 px-1.5">Note</Badge>}
+                            {evt.note && <Badge variant="outline" className="text-xs py-0 px-1">Note</Badge>}
                             {evt.reminder && (
-                              <Badge variant="outline" className="gap-1 text-xs py-0 px-1.5">
+                              <Badge variant="outline" className="gap-1 text-xs py-0 px-1">
                                 <BellIcon className="h-2.5 w-2.5" />
                                 Reminder
                               </Badge>
                             )}
                             {evt.recurrence && (
-                              <Badge variant="outline" className="gap-1 text-xs py-0 px-1.5">
+                              <Badge variant="outline" className="gap-1 text-xs py-0 px-1">
                                 <RotateCcwIcon className="h-2.5 w-2.5" />
                                 {evt.recurrence.frequency}
                               </Badge>
@@ -1123,7 +1206,7 @@ export default function Planner() {
                           </div>
                         )}
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 flex-shrink-0">
                         {evt && (
                           <TooltipProvider>
                             <Tooltip>
@@ -1131,7 +1214,7 @@ export default function Planner() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-8 w-8 p-0"
+                                  className="h-8 w-8 p-0 touch-manipulation min-h-[32px] min-w-[32px]"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     toggleCompletion(key);
@@ -1167,10 +1250,10 @@ export default function Planner() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-8 w-8 p-0"
+                                className="h-8 w-8 p-0 touch-manipulation min-h-[32px] min-w-[32px]"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  const dayToSelect = new Date(day); // Create a new Date instance
+                                  const dayToSelect = new Date(day); 
                                   setSelected(dayToSelect);
                                   setDraftDescription(evt?.description || "");
                                   setDraftCategory(evt?.category || "_none_");
@@ -1192,17 +1275,15 @@ export default function Planner() {
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
-                        {/* Full-screen note button */}
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-8 w-8 p-0"
+                                className="h-8 w-8 p-0 touch-manipulation min-h-[32px] min-w-[32px]"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  // FIXED: Changed to use handleDateSelect
                                   handleDateSelect(day);
                                   setFullDraft(evt?.note || "");
                                   setFullEditorOpen(key);
@@ -1224,7 +1305,7 @@ export default function Planner() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-8 w-8 p-0"
+                                  className="h-8 w-8 p-0 touch-manipulation min-h-[32px] min-w-[32px]"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     if (confirm(`Delete event on ${key}?`))
@@ -1298,7 +1379,6 @@ export default function Planner() {
                     Save
                   </Button>
                 </div>
-                {/* Optionally show a small preview of the note if it exists */}
                 <div className="mt-4">
                   <Label>Full note</Label>
                   <div className="mt-2 text-sm text-muted-foreground">
@@ -1314,25 +1394,59 @@ export default function Planner() {
                 <kbd className="rounded border px-1">Enter</kbd> to save in
                 editors.
               </div>
+              
+              {/* Permanent Notes Section */}
+              {permanentNotes.length > 0 && (
+                <div className="mt-4 sm:mt-6">
+                  <div className="flex items-center justify-between mb-2 sm:mb-3">
+                    <h3 className="text-sm font-medium">Permanent Notes</h3>
+                    <Badge variant="secondary" className="text-xs">{permanentNotes.length}</Badge>
+                  </div>
+                  <div className="space-y-1 sm:space-y-2">
+                    {permanentNotes.slice(0, 3).map((note) => (
+                      <div 
+                        key={note.id} 
+                        className="p-2 border rounded text-sm cursor-pointer hover:bg-muted transition-colors touch-manipulation"
+                        onClick={() => {
+                          setQuickNote(note.content);
+                          setNotePreviewMode(true);
+                          setNotePopupOpen(true);
+                        }}
+                      >
+                        <div className="line-clamp-2 text-xs sm:text-sm">{note.content}</div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {note.timestamp ? new Date(note.timestamp).toLocaleDateString() : 'Unknown date'}
+                        </div>
+                      </div>
+                    ))}
+                    {permanentNotes.length > 3 && (
+                      <div className="text-xs text-muted-foreground text-center pt-1">
+                        +{permanentNotes.length - 3} more notes
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
             </ScrollArea>
           </section>
         </div>
-        {/* Fullscreen event editor (separate NOTE field) */}
         {fullEditorOpen && (
           <div className="fixed inset-0 z-50 flex flex-col bg-background">
-            <div className="flex items-center justify-between p-4 border-b shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 border-b shadow-sm gap-3">
               <div>
-                <div className="text-sm text-muted-foreground">
+                <div className="text-xs sm:text-sm text-muted-foreground">
                   Editing note
                 </div>
-                <div className="text-lg font-semibold">
+                <div className="text-base sm:text-lg font-semibold">
                   {formatReadable(fullEditorOpen)}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   variant="outline"
                   onClick={() => setMarkdownPreview(!markdownPreview)}
+                  className="text-xs sm:text-sm px-2 py-1 h-7 sm:h-9"
                 >
                   {markdownPreview ? "Edit" : "Preview"}
                 </Button>
@@ -1340,31 +1454,33 @@ export default function Planner() {
                   variant="outline"
                   onClick={cancelFull}
                   aria-label="Cancel full editor"
+                  className="text-xs sm:text-sm px-2 py-1 h-7 sm:h-9"
                 >
-                  <XIcon className="h-4 w-4" />
+                  <XIcon className="h-3 w-3 sm:h-4 sm:w-4" />
                   Cancel
                 </Button>
                 <Button
                   onClick={() => saveFullNote()}
                   disabled={!fullDraft.trim()}
+                  className="text-xs sm:text-sm px-2 py-1 h-7 sm:h-9"
                 >
-                  <SaveIcon className="h-4 w-4" />
+                  <SaveIcon className="h-3 w-3 sm:h-4 sm:w-4" />
                   Save
                 </Button>
               </div>
             </div>
             <ResizablePanelGroup direction="horizontal" className="flex-1">
               <ResizablePanel defaultSize={70} minSize={30}>
-                <div className="p-4 h-full">
+                <div className="p-3 sm:p-4 h-full">
                   {markdownPreview ? (
-                    <div className="prose dark:prose-invert max-w-none p-4 border rounded-md h-full overflow-auto">
+                    <div className="prose prose-xs sm:prose-sm dark:prose-invert max-w-none p-3 sm:p-4 border rounded-md h-full overflow-auto">
                       {fullDraft || <em>No content to preview</em>}
                     </div>
                   ) : (
                     <Textarea
                       value={fullDraft}
                       onChange={(e) => setFullDraft(e.target.value)}
-                      className="h-full min-h-[30vh] w-full resize-none font-mono"
+                      className="h-full min-h-[40vh] sm:min-h-[30vh] w-full resize-none font-mono text-sm"
                       placeholder={`Write anything you want for ${formatReadable(
                         fullEditorOpen
                       )}... (Markdown supported)`}
@@ -1381,15 +1497,15 @@ export default function Planner() {
                 <>
                   <ResizableHandle />
                   <ResizablePanel defaultSize={30} minSize={20}>
-                    <div className="p-4 h-full overflow-auto">
-                      <div className="prose dark:prose-invert max-w-none">
-                        <h3>Markdown Preview</h3>
-                        <div className="border rounded-md p-4">
+                    <div className="p-3 sm:p-4 h-full overflow-auto">
+                      <div className="prose prose-xs sm:prose-sm dark:prose-invert max-w-none">
+                        <h3 className="text-base sm:text-lg">Markdown Preview</h3>
+                        <div className="border rounded-md p-3 sm:p-4">
                           {fullDraft || <em>No content to preview</em>}
                         </div>
-                        <div className="mt-4 text-sm text-muted-foreground">
-                          <h4>Markdown Tips:</h4>
-                          <ul>
+                        <div className="mt-3 sm:mt-4 text-xs sm:text-sm text-muted-foreground">
+                          <h4 className="text-sm sm:text-base">Markdown Tips:</h4>
+                          <ul className="space-y-1">
                             <li>
                               **Bold** for <strong>bold text</strong>
                             </li>
@@ -1410,6 +1526,165 @@ export default function Planner() {
             </ResizablePanelGroup>
           </div>
         )}
+        
+        <Dialog open={notePopupOpen} onOpenChange={setNotePopupOpen}>
+          <DialogContent className="max-w-2xl max-h-[85vh] mx-2 sm:mx-0">
+            <DialogHeader>
+              <div className="flex items-center gap-2">
+                <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <span>Keep Note Forever</span>
+                  <div className="flex items-center gap-1 text-yellow-500">
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                    <span className="text-xs sm:text-sm font-normal">Keep your note here always</span>
+                  </div>
+                </DialogTitle>
+              </div>
+              <DialogDescription>
+                
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-3 sm:gap-4 py-3 sm:py-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+                <div className="flex gap-1 sm:gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => applyFormatting('# ', '')}
+                    className="text-xs px-2 py-1 h-7 sm:h-8"
+                  >
+                    H1
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => applyFormatting('**', '**')}
+                    className="text-xs font-bold px-2 py-1 h-7 sm:h-8"
+                  >
+                    B
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => applyFormatting('*', '*')}
+                    className="text-xs underline px-2 py-1 h-7 sm:h-8"
+                  >
+                    I
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => applyFormatting('~~', '~~')}
+                    className="text-xs line-through px-2 py-1 h-7 sm:h-8"
+                  >
+                    S
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => applyFormatting('\n- [ ] ', '')}
+                    className="text-xs px-2 py-1 h-7 sm:h-8"
+                  >
+                    ☑
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="note-preview-toggle" className="text-xs sm:text-sm">
+                    {notePreviewMode ? "Preview" : "Edit"}
+                  </Label>
+                  <button
+                    id="note-preview-toggle"
+                    role="switch"
+                    aria-checked={notePreviewMode}
+                    onClick={() => setNotePreviewMode(!notePreviewMode)}
+                    className={`relative inline-flex h-5 w-9 sm:h-6 sm:w-11 items-center rounded-full transition-colors ${
+                      notePreviewMode ? "bg-primary" : "bg-input"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-3 w-3 sm:h-4 sm:w-4 transform rounded-full bg-background transition-transform ${
+                        notePreviewMode ? "translate-x-5 sm:translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+              
+              {!notePreviewMode ? (
+                <div className="grid gap-3 sm:gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="quick-note" className="text-sm sm:text-base">Note Content</Label>
+                    <Textarea
+                      id="quick-note"
+                      value={quickNote}
+                      onChange={(e) => setQuickNote(e.target.value)}
+                      placeholder="Write your permanent note here..."
+                      rows={5}
+                      className="resize-none text-sm font-light"
+                    />
+                  </div>
+                  
+                  {quickNote && (
+                    <div className="grid gap-2">
+                      <Label className="text-sm sm:text-base">Preview</Label>
+                      <div className="border rounded-md p-2 sm:p-3 bg-muted/30 min-h-[80px] sm:min-h-[100px] max-h-[150px] sm:max-h-[200px] overflow-y-auto">
+                        <div className="prose prose-xs sm:prose-sm dark:prose-invert max-w-none">
+                          <div dangerouslySetInnerHTML={{
+                            __html: quickNote
+                              .replace(/^# (.*$)/gim, '<h1 style="font-size: 1.5em; font-weight: bold; margin: 0.5em 0;">$1</h1>')
+                              .replace(/^## (.*$)/gim, '<h2 style="font-size: 1.3em; font-weight: bold; margin: 0.6em 0;">$1</h2>')
+                              .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                              .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                              .replace(/~~(.*?)~~/g, '<del>$1</del>')
+                              .replace(/^- \[ \] (.*$)/gim, '<div><input type="checkbox" class="mr-2" disabled> $1</div>')
+                              .replace(/^- \[x\] (.*$)/gim, '<div><input type="checkbox" class="mr-2" checked disabled> $1</div>')
+                              .replace(/\n/g, '<br>')
+                          }} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="grid gap-2">
+                  <Label className="text-sm sm:text-base">Preview</Label>
+                  <div className="border rounded-md p-2 sm:p-3 bg-muted/30 min-h-[200px] sm:min-h-[300px] max-h-[300px] sm:max-h-[400px] overflow-y-auto">
+                    <div className="prose prose-xs sm:prose-sm dark:prose-invert max-w-none">
+                      {quickNote ? (
+                        <div dangerouslySetInnerHTML={{
+                          __html: quickNote
+                            .replace(/^# (.*$)/gim, '<h1 style="font-size: 1.5em; font-weight: bold; margin: 0.5em 0;">$1</h1>')
+                            .replace(/^## (.*$)/gim, '<h2 style="font-size: 1.3em; font-weight: bold; margin: 0.6em 0;">$1</h2>')
+                            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                            .replace(/~~(.*?)~~/g, '<del>$1</del>')
+                            .replace(/^- \[ \] (.*$)/gim, '<div><input type="checkbox" class="mr-2" disabled> $1</div>')
+                            .replace(/^- \[x\] (.*$)/gim, '<div><input type="checkbox" class="mr-2" checked disabled> $1</div>')
+                            .replace(/\n/g, '<br>')
+                        }} />
+                      ) : (
+                        <em>No content to preview</em>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => {
+                setQuickNote("");
+                setNotePopupOpen(false);
+              }} className="text-sm sm:text-base">
+                Cancel
+              </Button>
+              <Button onClick={handleSaveNote} disabled={!quickNote.trim()} className="text-sm sm:text-base">
+                Save Permanent Note
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
       </div>
     </div>
   );

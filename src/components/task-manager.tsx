@@ -19,9 +19,6 @@ export function TaskManager() {
     return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
   })
 
-  // Remove the booked dates to unlock all dates
-  // const bookedDates = Array.from({ length: 3 }, (_, i) => new Date(2025, 5, 17 + i))
-
   return (
     <div className="flex justify-center w-full">
       <Card className='gap-0 p-0 w-full max-w-2xl'>
@@ -35,16 +32,7 @@ export function TaskManager() {
               selected={date}
               onSelect={setDate}
               defaultMonth={date}
-              // Remove disabled dates to unlock all dates
-              // disabled={bookedDates}
               showOutsideDays={false}
-              // Remove modifiers for booked dates
-              // modifiers={{
-              //   booked: bookedDates
-              // }}
-              // modifiersClassNames={{
-              //   booked: '[&>button]:line-through opacity-100'
-              // }}
               className='bg-transparent p-0 [--cell-size:--spacing(10)]'
               formatters={{
                 formatWeekdayName: date => {

@@ -19,23 +19,18 @@ export function Calendar32() {
   const [open, setOpen] = React.useState(false);
   const [date, setDate] = React.useState<Date | undefined>(undefined);
 
-  // Define the minimum and maximum dates
-  const minDate = new Date(2025, 0, 1); // January 1, 2025
-  const maxDate = new Date(2030, 11, 31); // December 31, 2030
+  const minDate = new Date(2025, 0, 1);
+  const maxDate = new Date(2030, 11, 31);
 
-  // Function to disable dates outside our range
   const isDateDisabled = (date: Date) => {
     return date < minDate || date > maxDate;
   };
 
-  // Handle date selection without closing the drawer
   const handleDateSelect = (date: Date | undefined) => {
     setDate(date);
   };
 
-  // Handle adding event and closing the drawer
   const handleAddEvent = () => {
-    // Here you would typically add your event creation logic
     console.log("Event created for date:", date);
     setOpen(false);
   };
