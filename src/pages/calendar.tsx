@@ -1,8 +1,9 @@
   import * as React from "react";
-  import { format, addDays, startOfWeek, parseISO, isSameDay, setHours, addHours, startOfDay } from "date-fns";
-  import { ChevronLeft, ChevronRight, X, Download, Upload } from "lucide-react";
+  import { format, addDays, parseISO, isSameDay, startOfDay } from "date-fns";
+  import { ChevronLeft, ChevronRight, Download, Upload } from "lucide-react";
   import { Button } from "@/components/ui/button";
   import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+  import { Input } from "@/components/ui/input";
 
   // Simple event type
   interface CalendarEvent {
@@ -40,19 +41,37 @@
 
   // Event editor form component
   const EventEditor: React.FC<{ 
-    event: CalendarEvent; 
+    event: CalendarEvent | null; 
     onSave: (updatedEvent: CalendarEvent) => void;
     onCancel: () => void;
     open: boolean;
     onOpenChange: (open: boolean) => void;
   }> = ({ event, onSave, onCancel, open, onOpenChange }) => {
-    const [title, setTitle] = React.useState(event.title);
-    const [startTime, setStartTime] = React.useState(format(parseISO(event.startDate), "HH:mm"));
-    const [endTime, setEndTime] = React.useState(format(parseISO(event.endDate), "HH:mm"));
-    const [color, setColor] = React.useState(event.color);
+    const [title, setTitle] = React.useState(event?.title || "");
+    const [startTime, setStartTime] = React.useState(
+      event ? format(parseISO(event.startDate), "HH:mm") : "09:00"
+    );
+    const [endTime, setEndTime] = React.useState(
+      event ? format(parseISO(event.endDate), "HH:mm") : "10:00"
+    );
+    const [color, setColor] = React.useState<CalendarEvent["color"]>(
+      event?.color || "blue"
+    );
+
+    React.useEffect(() => {
+      if (event) {
+        setTitle(event.title);
+        setStartTime(format(parseISO(event.startDate), "HH:mm"));
+        setEndTime(format(parseISO(event.endDate), "HH:mm"));
+        setColor(event.color);
+      }
+    }, [event]);
 
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
+      
+      // Check if event exists before proceeding
+      if (!event) return;
       
       // Combine event date with new time values
       const [startHours, startMinutes] = startTime.split(":").map(Number);
@@ -94,21 +113,21 @@
               
               <div>
                 <label className="block text-sm font-medium mb-1">Start Time</label>
-                <input
+                <Input
                   type="time"
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
-                  className="w-full border rounded px-3 py-2 text-sm"
+                  className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
                 />
               </div>
               
               <div>
                 <label className="block text-sm font-medium mb-1">End Time</label>
-                <input
+                <Input
                   type="time"
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
-                  className="w-full border rounded px-3 py-2 text-sm"
+                  className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
                 />
               </div>
               
@@ -116,7 +135,9 @@
                 <label className="block text-sm font-medium mb-1">Color</label>
                 <select
                   value={color}
-                  onChange={(e) => setColor(e.target.value as any)}
+                  onChange={(e) =>
+                    setColor(e.target.value as CalendarEvent["color"])
+                  }
                   className="w-full border rounded px-3 py-2 text-sm"
                 >
                   <option value="blue">Blue</option>
@@ -206,21 +227,21 @@
             
             <div>
               <label className="block text-sm font-medium mb-1">Start Time</label>
-              <input
+              <Input
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="w-full border rounded px-3 py-2 text-sm"
+                className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
               />
             </div>
             
             <div>
               <label className="block text-sm font-medium mb-1">End Time</label>
-              <input
+              <Input
                 type="time"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                className="w-full border rounded px-3 py-2 text-sm"
+                className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
               />
             </div>
             
@@ -278,12 +299,16 @@
     onEdit: (event: CalendarEvent) => void;
     onDelete: (id: string) => void; // Add delete handler
     position: { left: number; width: number }; // For positioning overlapping events
-  }> = React.memo(({ event, onMove, onResize, onEdit, onDelete, position }) => {
+    isDraggingId: string | null; // Track which event is being dragged
+  }> = React.memo(({ event, onMove, onResize, onEdit, onDelete, position, isDraggingId }) => {
     // Parse dates only once and ensure they update when event changes
     const start = React.useMemo(() => parseISO(event.startDate), [event.startDate]);
     const end = React.useMemo(() => parseISO(event.endDate), [event.endDate]);
     const durationInMinutes = React.useMemo(() => (end.getTime() - start.getTime()) / (1000 * 60), [start, end]);
     const heightInPixels = React.useMemo(() => (durationInMinutes / 60) * 48 - 4, [durationInMinutes]);
+
+    // Use ref to track drag state for reliable access in event handlers
+    const isDragging = React.useRef(false);
 
     const colorClasses = {
       blue: "bg-blue-100 border-blue-200 text-blue-800",
@@ -306,9 +331,21 @@
       
       e.stopPropagation();
       
+      // Prevent text selection during drag
+      const body = document.body;
+      body.classList.add('select-none');
+      
+      // Disable pointer events on all event blocks during drag
+      const eventBlocks = document.querySelectorAll('.event-block');
+      eventBlocks.forEach(block => block.classList.add('pointer-events-none'));
+      
+      // Set dragging state
+      isDragging.current = true;
+      
       const startY = e.clientY;
       const originalStart = new Date(start);
       const originalEnd = new Date(end);
+      const originalDuration = originalEnd.getTime() - originalStart.getTime();
       
       const handleMouseMove = (moveEvent: MouseEvent) => {
         moveEvent.preventDefault();
@@ -317,21 +354,83 @@
         const deltaY = moveEvent.clientY - startY;
         const minutesDiff = Math.round(deltaY / 48 * 60); // 48px = 1 hour
         
-        // Create new dates
-        const newStart = new Date(originalStart.getTime() + minutesDiff * 60000);
-        const newEnd = new Date(originalEnd.getTime() + minutesDiff * 60000);
+        // Snap to 5-minute intervals
+        const snappedMinutesDiff = Math.round(minutesDiff / 5) * 5;
         
-        onMove(event.id, newStart.toISOString(), newEnd.toISOString());
-      };
+        // Create new dates based on the drag
+        const newStart = new Date(originalStart.getTime() + snappedMinutesDiff * 60000);
+        const newEnd = new Date(originalEnd.getTime() + snappedMinutesDiff * 60000);
+        
+        // Handle looping behavior when dragging beyond calendar boundaries
+        let finalStart = newStart;
+        let finalEnd = newEnd;
+        
+        // If dragged beyond the top (00:00), loop to the bottom (23:59)
+        if (newStart < originalStart && (newStart.getDate() < originalStart.getDate() || 
+          newStart.getMonth() < originalStart.getMonth() || 
+          newStart.getFullYear() < originalStart.getFullYear())) {
+        // Move to the same day but at the bottom of the time range (around 23:55)
+        finalStart = new Date(originalStart);
+        finalStart.setHours(23, 55, 0, 0);
+        
+        // Adjust end time to maintain the original duration
+        finalEnd = new Date(finalStart.getTime() + originalDuration);
+        
+        // If the event extends past midnight, cap it at 23:59:59
+        const endOfDay = new Date(originalStart);
+        endOfDay.setHours(23, 59, 59, 999);
+        if (finalEnd > endOfDay) {
+          finalEnd = endOfDay;
+          // Adjust start time to maintain duration
+          finalStart = new Date(finalEnd.getTime() - originalDuration);
+        }
+      }
+      // If dragged beyond the bottom (23:59), loop to the top (00:00)
+      else if (newEnd > originalEnd && (newEnd.getDate() > originalEnd.getDate() || 
+                newEnd.getMonth() > originalEnd.getMonth() || 
+                newEnd.getFullYear() > originalEnd.getFullYear())) {
+        // Move to the same day but at the top of the time range (00:00)
+        finalStart = new Date(originalStart);
+        finalStart.setHours(0, 0, 0, 0);
+        
+        // Adjust end time to maintain the original duration
+        finalEnd = new Date(finalStart.getTime() + originalDuration);
+        
+        // If the event extends past midnight, cap it at the end of the day
+        const startOfDay = new Date(originalStart);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfNextDay = new Date(startOfDay);
+        endOfNextDay.setDate(startOfDay.getDate() + 1);
+        endOfNextDay.setMilliseconds(endOfNextDay.getMilliseconds() - 1);
+        
+        if (finalEnd > endOfNextDay) {
+          finalEnd = new Date(finalStart);
+          finalEnd.setHours(23, 59, 59, 999);
+        }
+      }
       
-      const handleMouseUp = () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-      
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
+      onMove(event.id, finalStart.toISOString(), finalEnd.toISOString());
     };
+      
+    const handleMouseUp = () => {
+      // Reset dragging flag to false
+      isDragging.current = false;
+        
+      // Re-enable text selection
+      const body = document.body;
+      body.classList.remove('select-none');
+        
+      // Re-enable pointer events on all event blocks
+      const eventBlocks = document.querySelectorAll('.event-block');
+      eventBlocks.forEach(block => block.classList.remove('pointer-events-none'));
+        
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+      
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
 
     // Handle resize start
     const handleResizeStart = (e: React.MouseEvent) => {
@@ -416,11 +515,24 @@
     }, [swipeStart]);
 
     // Handle double click to edit
-    const handleDoubleClick = () => {
-      // Don't edit if we're showing the delete button
-      if (showDelete) return;
+    const handleDoubleClick = (e: React.MouseEvent) => {
+      // Don't edit if we're showing the delete button or dragging
+      if (showDelete || isDragging.current) return;
+      
+      // Prevent event from bubbling up to parent elements
+      e.stopPropagation();
+      e.preventDefault();
       
       onEdit(event);
+    };
+
+    // Handle mouse down on the main event area
+    const handleEventMouseDown = (e: React.MouseEvent) => {
+      // Don't start drag if we're showing the delete button
+      if (showDelete) return;
+      
+      // Check if this is a potential drag start
+      handleDragStart(e);
     };
 
     // Handle delete
@@ -430,12 +542,13 @@
 
     return (
       <div 
-        className={`absolute rounded border px-1 py-0.5 text-xs truncate cursor-move ${colorClasses[event.color]}`}
+        className={`absolute rounded border px-1 py-0.5 text-xs truncate cursor-move select-none event-block ${colorClasses[event.color]}`}
         style={{ 
           height: `${heightInPixels}px`,
           top: `${(start.getMinutes() / 60) * 48}px`,
           left: `${position.left}%`,
-          width: `${position.width}%`
+          width: `${position.width}%`,
+          zIndex: isDraggingId === event.id ? 50 : 10 // Bring dragged event to front
         }}
         onMouseDown={handleSwipeStart}
       >
@@ -451,13 +564,13 @@
         ) : (
           <>
             <div 
-              onMouseDown={handleDragStart}
+              onMouseDown={handleEventMouseDown}
               onDoubleClick={handleDoubleClick}
               className="h-full w-full"
             >
               <div className="font-medium truncate">{event.title}</div>
               <div>
-                {format(start, "h:mm a")} - {format(end, "h:mm a")}
+                {format(start, "HH:mm")} - {format(end, "HH:mm")}
               </div>
             </div>
             {/* Resize handle */}
@@ -477,7 +590,7 @@
       <div className="relative" style={{ height: "48px", minHeight: "48px" }}>
         <div className="absolute -top-3 right-1 flex h-6 items-center">
           <span className="text-[0.6rem] text-muted-foreground">
-            {format(new Date().setHours(hour, 0, 0, 0), "hh a")}
+            {format(new Date().setHours(hour, 0, 0, 0), "HH:mm")}
           </span>
         </div>
         
@@ -499,10 +612,9 @@
   // Calendar day view component
   const CalendarDayView: React.FC<{ 
     selectedDate: Date; 
-    setSelectedDate: (date: Date) => void;
     events: CalendarEvent[];
     setEvents: React.Dispatch<React.SetStateAction<CalendarEvent[]>>;
-  }> = ({ selectedDate, setSelectedDate, events, setEvents }) => {
+  }> = ({ selectedDate, events, setEvents }) => {
     const [editingEvent, setEditingEvent] = React.useState<CalendarEvent | null>(null);
     
     // Update event position
@@ -553,90 +665,150 @@
     };
 
     const dayEvents = getEventsForDay(selectedDate, events);
-    
-    // Group events by hour and calculate positions for overlapping events
-    const eventsByHour: Record<number, CalendarEvent[]> = {};
+
+    // Function to check if two events overlap
+    const eventsOverlap = (event1: CalendarEvent, event2: CalendarEvent) => {
+      const start1 = parseISO(event1.startDate);
+      const end1 = parseISO(event1.endDate);
+      const start2 = parseISO(event2.startDate);
+      const end2 = parseISO(event2.endDate);
+      
+      return start1 < end2 && start2 < end1;
+    };
+
+    // Function to find overlapping groups
+    const getOverlappingGroups = (events: CalendarEvent[]) => {
+      const groups: CalendarEvent[][] = [];
+      const visited = new Set<string>();
+      
+      events.forEach(event => {
+        if (visited.has(event.id)) return;
+        
+        const group: CalendarEvent[] = [event];
+        visited.add(event.id);
+        
+        const checkOverlaps = (currentEvent: CalendarEvent) => {
+          events.forEach(otherEvent => {
+            if (
+              !visited.has(otherEvent.id) && 
+              eventsOverlap(currentEvent, otherEvent)
+            ) {
+              group.push(otherEvent);
+              visited.add(otherEvent.id);
+              checkOverlaps(otherEvent);
+            }
+          });
+        };
+        
+        checkOverlaps(event);
+        groups.push(group);
+      });
+      
+      return groups;
+    };
+
+    // Calculate positions for overlapping events
     const eventPositions: Record<string, { left: number; width: number }> = {};
     
-    // Initialize eventsByHour for all 24 hours
-    for (let i = 0; i < 24; i++) {
-      eventsByHour[i] = [];
-    }
+    // Get overlapping groups
+    const overlappingGroups = getOverlappingGroups(dayEvents);
     
-    // Group events by their start hour
-    dayEvents.forEach(event => {
-      const startHour = parseISO(event.startDate).getHours();
-      eventsByHour[startHour].push(event);
-    });
-    
-    // Calculate positions for overlapping events
-    Object.keys(eventsByHour).forEach(hourKey => {
-      const hour = parseInt(hourKey);
-      const hourEvents = eventsByHour[hour];
-      
-      // Sort events by start time
-      hourEvents.sort((a, b) => 
+    // Process each group
+    overlappingGroups.forEach(group => {
+      // Sort events in group by start time
+      group.sort((a, b) => 
         parseISO(a.startDate).getTime() - parseISO(b.startDate).getTime()
       );
       
-      // Calculate positions
-      hourEvents.forEach((event, index) => {
-        if (hourEvents.length === 1) {
-          // Single event takes full width
-          eventPositions[event.id] = { left: 4, width: 92 };
-        } else {
-          // Multiple events split the width
-          const width = 92 / hourEvents.length;
-          const left = 4 + (index * width);
-          eventPositions[event.id] = { left, width };
-        }
-      });
+      if (group.length === 1) {
+        // Single event takes full width
+        eventPositions[group[0].id] = { left: 0, width: 100 };
+      } else {
+        // Multiple overlapping events split the width
+        const width = 100 / group.length;
+        group.forEach((event, index) => {
+          eventPositions[event.id] = { 
+            left: index * width, 
+            width: width - (group.length > 1 ? 1 : 0) // Subtract 1 for spacing between events
+          };
+        });
+      }
     });
-    
+
     // Generate hours (12 AM to 11 PM)
     const hours = Array.from({ length: 24 }, (_, i) => i);
+
+    // State to track which event is being dragged
+    const [draggingEventId, setDraggingEventId] = React.useState<string | null>(null);
+
+    // Custom move event handler to track dragging event
+    const handleMoveEvent = (id: string, newStartDate: string, newEndDate: string) => {
+      setDraggingEventId(id);
+      moveEvent(id, newStartDate, newEndDate);
+    };
+
+    // Custom resize event handler to track dragging event
+    const handleResizeEvent = (id: string, newEndDate: string) => {
+      setDraggingEventId(id);
+      resizeEvent(id, newEndDate);
+    };
+
+    // Reset dragging event when mouse is released
+    React.useEffect(() => {
+      const handleMouseUp = () => {
+        setDraggingEventId(null);
+      };
+
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }, []);
 
     return (
       <div className="flex flex-col h-full">
         {/* Calendar grid */}
-        <div className="flex flex-1 overflow-auto">
+        <div className="flex flex-1 overflow-auto select-none">
           {/* Hours column */}
-          <div className="w-12 flex-shrink-0">
-            {hours.map(hour => (
+          <div className="w-12 flex-shrink-0 pt-1 pb-1">
+            {hours.map((hour) => (
               <TimeSlot key={hour} hour={hour} />
             ))}
           </div>
-          
+
           {/* Events column */}
-          <div className="flex-1 border-l relative">
-            {hours.map(hour => (
-              <div 
-                key={hour} 
-                className="relative border-b" 
+          <div className="flex-1 border-l relative pt-1 pb-1">
+            {hours.map((hour) => (
+              <div
+                key={hour}
+                className="relative border-b"
                 style={{ height: "48px", minHeight: "48px" }}
               >
                 {/* Render events for this hour */}
-                {eventsByHour[hour].map(event => (
-                  <EventBlock 
-                    key={event.id} 
-                    event={event} 
-                    onMove={moveEvent}
-                    onResize={resizeEvent}
-                    onEdit={editEvent}
-                    onDelete={deleteEvent}
-                    position={eventPositions[event.id] || { left: 4, width: 92 }}
-                  />
-                ))}
+                {dayEvents
+                  .filter(event => parseISO(event.startDate).getHours() === hour)
+                  .map((event) => (
+                    <EventBlock
+                      key={event.id}
+                      event={event}
+                      onMove={handleMoveEvent}
+                      onResize={handleResizeEvent}
+                      onEdit={editEvent}
+                      onDelete={deleteEvent}
+                      position={eventPositions[event.id] || { left: 0, width: 100 }}
+                      isDraggingId={draggingEventId}
+                    />
+                  ))}
               </div>
             ))}
           </div>
         </div>
-      
+
         {/* Event editor modal */}
         {editingEvent && (
-          <EventEditor 
-            event={editingEvent} 
-            onSave={saveEvent} 
+          <EventEditor
+            event={editingEvent}
+            onSave={saveEvent}
             onCancel={closeEditor}
             open={!!editingEvent}
             onOpenChange={(open) => !open && closeEditor()}
@@ -774,8 +946,7 @@
         <div className="flex-1">
           <div className="border rounded-lg p-2 sm:p-4 h-[calc(100%-2rem)]">
             <CalendarDayView 
-              selectedDate={selectedDate} 
-              setSelectedDate={setSelectedDate}
+              selectedDate={selectedDate}
               events={events}
               setEvents={setEvents}
             />
