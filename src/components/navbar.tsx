@@ -10,6 +10,7 @@ export default function Navbar() {
   const baseNavItems = [
     { path: "/home", icon: Home },
     { path: "/planner", icon: Calendar },
+    { path: "/calendar", icon: Calendar },
     { path: "/auth", icon: User, label: isAuthenticated ? (user?.username?.substring(0, 3) || user?.name?.substring(0, 3) || "...") : undefined }
   ];
   
