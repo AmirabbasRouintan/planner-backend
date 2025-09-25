@@ -2,7 +2,8 @@ import * as React from "react";
 import {
   DownloadIcon,
   UploadIcon,
-  StickyNoteIcon
+  StickyNoteIcon,
+  CalendarIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -756,8 +757,8 @@ export default function Planner() {
               cancelDescriptionEdit={cancelDescriptionEdit}
               editingKey={editingKey}
             />
-            <Button variant="outline" onClick={handleTodayClick}>
-              Today
+            <Button variant="outline" size="icon" onClick={handleTodayClick} title="Today">
+              <CalendarIcon className="h-4 w-4" />
             </Button>
             {/* Export buttons */}
             <Popover>
