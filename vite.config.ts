@@ -1,19 +1,10 @@
 import path from "path"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
-import { defineConfig } from "vite"
-import fs from "fs"
+import { defineConfig, loadEnv } from "vite"
+import { getBackendUrl } from "./backend.config.js"
 
-// Read dynamic proxy configuration
-let proxyTarget = 'http://localhost:8000'; // default
-
-try {
-  const config = JSON.parse(fs.readFileSync('./proxy-config.json', 'utf8'));
-  proxyTarget = config.target || proxyTarget;
-  console.log(`Using proxy target: ${proxyTarget}`);
-} catch (error) {
-  console.log('Using default proxy target: http://localhost:8000');
-}
+const backendUrl = getBackendUrl();
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -26,12 +17,12 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: proxyTarget,
+        target: backendUrl,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '/tickets/api')
       },
       '/download': {
-        target: proxyTarget,
+        target: backendUrl,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/download/, '/tickets/api/download')
       }

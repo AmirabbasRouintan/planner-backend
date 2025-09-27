@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { BACKEND_URL } from "@/config/backend";
 import V2RayHeader from "./V2RayHeader";
 import ServerConfig from "./ServerConfig";
 import ServerStatus from "./ServerStatus";
@@ -46,7 +47,7 @@ export default function V2RayMain() {
   const [configError, setConfigError] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [serverUrl, setServerUrl] = useState<string>("http://localhost:8000");
+  const [serverUrl, setServerUrl] = useState<string>(BACKEND_URL);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [testingConfigs, setTestingConfigs] = useState<number[]>([]);
   // const [testResults, setTestResults] = useState<Record<string, TestResult>>({});

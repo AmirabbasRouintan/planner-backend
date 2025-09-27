@@ -15,6 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { BACKEND_URL } from "@/config/backend";
 
 interface V2RayConfig {
   id?: number;
@@ -83,7 +84,7 @@ export default function ServerConfig({
               type="text"
               value={serverUrl}
               onChange={(e) => setServerUrl(e.target.value)}
-              placeholder="Enter server URL (e.g., http://localhost:8000)"
+              placeholder={`Enter server URL (e.g., ${BACKEND_URL})`}
               className="flex-1 h-8 md:h-10 text-xs md:text-sm"
             />
             <Button 
@@ -280,7 +281,7 @@ export default function ServerConfig({
           </div>
           
           <div className="text-xs md:text-sm text-muted-foreground space-y-1">
-            <p>• Enter your Django server URL with port (e.g., http://localhost:8000)</p>
+            <p>• Enter your Django server URL with port (e.g., {BACKEND_URL})</p>
             <p>• Make sure the server is running and accessible</p>
             <p>• Connection will be tested automatically when you click Connect</p>
           </div>

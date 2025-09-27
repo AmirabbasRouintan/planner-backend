@@ -27,6 +27,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
+import { API_BASE_URL } from "@/config/backend";
 
 interface CalendarEvent {
   id: string;
@@ -39,7 +40,7 @@ interface CalendarEvent {
 }
 
 // API functions for tasks
-const API_URL = "http://localhost:8000/tickets/api";
+const API_URL = API_BASE_URL;
 
 const fetchTasks = async (token?: string): Promise<CalendarEvent[]> => {
   try {
@@ -399,7 +400,7 @@ const ChecklistComponent: React.FC<{
           console.log("No token provided");
         }
 
-        const response = await fetch("http://localhost:8000/tickets/api/checklist/", {
+        const response = await fetch(`${API_URL}/checklist/`, {
           method: "GET",
           headers,
           credentials: "include",
@@ -437,7 +438,7 @@ const ChecklistComponent: React.FC<{
           headers["Authorization"] = `Token ${token}`;
         }
         
-        const response = await fetch("http://localhost:8000/tickets/api/checklist/", {
+        const response = await fetch(`${API_URL}/checklist/`, {
           method: "POST",
           headers,
           credentials: "include",
@@ -473,7 +474,7 @@ const ChecklistComponent: React.FC<{
         headers["Authorization"] = `Token ${token}`;
       }
       
-      const response = await fetch(`http://localhost:8000/tickets/api/checklist/${id}/`, {
+      const response = await fetch(`${API_URL}/checklist/${id}/`, {
         method: "PUT",
         headers,
         credentials: "include",
@@ -506,7 +507,7 @@ const ChecklistComponent: React.FC<{
         headers["Authorization"] = `Token ${token}`;
       }
       
-      const response = await fetch(`http://localhost:8000/tickets/api/checklist/${id}/`, {
+      const response = await fetch(`${API_URL}/checklist/${id}/`, {
         method: "DELETE",
         headers,
         credentials: "include",

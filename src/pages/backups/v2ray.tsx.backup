@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { getBackendUrl } from "@/config/backend";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,7 +63,7 @@ export default function V2Ray() {
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [selectedConfig, setSelectedConfig] = useState<V2RayConfig | null>(null);
   const [selectedFile, setSelectedFile] = useState<ServerFile | null>(null);
-  const [serverUrl, setServerUrl] = useState<string>('http://localhost:8000');
+  const [serverUrl, setServerUrl] = useState<string>(getBackendUrl());
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [testingConfigs, setTestingConfigs] = useState<any[]>([]);
   const [testResults, setTestResults] = useState<Record<string, {latency: number, status: string}>>({});
@@ -975,7 +976,7 @@ export default function V2Ray() {
                   type="text"
                   value={serverUrl}
                   onChange={(e) => setServerUrl(e.target.value)}
-                  placeholder="Enter server URL (e.g., http://localhost:8000)"
+                  placeholder={`Enter server URL (e.g., ${getBackendUrl()})`}
                   className="flex-1 h-8 md:h-10 text-xs md:text-sm"
                 />
                 <Button 
@@ -1172,7 +1173,7 @@ export default function V2Ray() {
               </div>
               
               <div className="text-xs md:text-sm text-muted-foreground space-y-1">
-                <p>• Enter your Django server URL with port (e.g., http://localhost:8000)</p>
+                <p>• Enter your Django server URL with port (e.g., {getBackendUrl()})</p>
                 <p>• Make sure the server is running and accessible</p>
                 <p>• Connection will be tested automatically when you click Connect</p>
               </div>

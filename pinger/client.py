@@ -21,6 +21,10 @@ import socket
 import concurrent.futures
 from queue import Queue
 
+def get_backend_url():
+    """Get backend URL from environment variable or use default"""
+    return os.environ.get('BACKEND_URL', 'http://localhost:8000')
+
 class OptimizedV2RayTester:
     def __init__(self, root_tk=None):
         """
@@ -539,7 +543,7 @@ class FileUploaderApp:
         self.root.resizable(True, True)
         
         # Variables
-        self.server_url = "http://localhost:8000"
+        self.server_url = get_backend_url()
         # Pass the root window to the tester class so it can show message boxes
         self.v2ray_tester = OptimizedV2RayTester(root)
         self.v2ray_tester.set_log_callback(self.log_message)
