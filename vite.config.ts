@@ -1,33 +1,35 @@
 import path from "path"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
-import { defineConfig, loadEnv } from "vite"
-
-// Import the backend config using dynamic import to avoid TypeScript issues
-const { getBackendUrl } = require("./backend.config.cjs");
-
-const backendUrl = getBackendUrl();
+import { defineConfig } from "vite"
 
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
-  },
-  server: {
-    proxy: {
-      '/api': {
-        target: backendUrl,
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '/tickets/api')
+export default defineConfig(async () => {
+  // Import the backend config using dynamic import to avoid TypeScript issues
+  // @ts-expect-error - backend.config.cjs is a CommonJS module without type declarations
+  const backendConfig: { getBackendUrl: () => string } = await import("./backend.config.cjs");
+  const backendUrl = backendConfig.getBackendUrl();
+
+  return {
+    plugins: [react(), tailwindcss()],
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./src"),
       },
-      '/download': {
-        target: backendUrl,
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/download/, '/tickets/api/download')
+    },
+    server: {
+      proxy: {
+        '/api': {
+          target: backendUrl,
+          changeOrigin: true,
+          rewrite: (path: string) => path.replace(/^\/api/, '/tickets/api')
+        },
+        '/download': {
+          target: backendUrl,
+          changeOrigin: true,
+          rewrite: (path: string) => path.replace(/^\/download/, '/tickets/api/download')
+        }
       }
     }
-  }
-})
+  };
+});
