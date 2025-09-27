@@ -2,7 +2,9 @@ import path from "path"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
 import { defineConfig, loadEnv } from "vite"
-import { getBackendUrl } from "./backend.config.js"
+
+// Import the backend config using dynamic import to avoid TypeScript issues
+const { getBackendUrl } = require("./backend.config.cjs");
 
 const backendUrl = getBackendUrl();
 
