@@ -11,9 +11,11 @@ from django.views.decorators.http import require_http_methods
 from django.utils.decorators import method_decorator
 from django.contrib.auth.hashers import make_password
 from django.db import IntegrityError
+from django.db.models import Q
 import json
 import os
-from .models import Ticket, ConfigFile, V2RayConfig, UserProfile, PermanentNote
+from datetime import datetime
+from .models import Ticket, ConfigFile, V2RayConfig, UserProfile, PermanentNote, Task, Token, ChecklistItem
 
 
 def add_cors_headers(view_func):
@@ -38,6 +40,255 @@ def add_cors_headers(view_func):
             
         return response
     return wrapper
+
+# Task API Endpoints
+@csrf_exempt
+@add_cors_headers
+def task_api(request):
+    """API endpoint for task CRUD operations"""
+    if request.method == 'OPTIONS':
+        return JsonResponse({'status': 'ok'})
+    
+    # Check if user is authenticated either via session or token
+    user = None
+    if request.user.is_authenticated:
+        user = request.user
+    else:
+        # Check for token authentication
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if auth_header.startswith('Token '):
+            token_key = auth_header.split(' ')[1]
+            # Validate token and get user
+            try:
+                token = Token.objects.get(key=token_key)
+                user = token.user
+            except Token.DoesNotExist:
+                pass
+    
+    if not user:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    # Get all tasks for the authenticated user
+    if request.method == 'GET':
+        tasks = Task.objects.filter(user=user)
+        tasks_data = []
+        
+        for task in tasks:
+            task_data = {
+                'id': task.id,
+                'title': task.title,
+                'startDate': task.start_date.isoformat(),
+                'endDate': task.end_date.isoformat(),
+                'color': task.color,
+                'isImportant': task.is_important,
+                'createdAt': task.created_at.isoformat() if task.created_at else None,
+                'updatedAt': task.updated_at.isoformat() if task.updated_at else None
+            }
+            if task.description:
+                task_data['description'] = task.description
+            tasks_data.append(task_data)
+        
+        # Update user's daily events JSON
+        update_user_daily_events_json(user)
+        
+        return JsonResponse({'tasks': tasks_data})
+    
+    # Create a new task
+    elif request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            
+            # Create new task
+            task = Task(
+                user=user,
+                title=data.get('title'),
+                start_date=datetime.fromisoformat(data.get('startDate').replace('Z', '+00:00')),
+                end_date=datetime.fromisoformat(data.get('endDate').replace('Z', '+00:00')),
+                color=data.get('color', 'blue'),
+                is_important=data.get('isImportant', False)
+            )
+            
+            # Add description if provided
+            if 'description' in data:
+                task.description = data['description']
+            
+            task.save()
+            
+            # Update user's daily events JSON
+            update_user_daily_events_json(user)
+            
+            task_data = {
+                'id': task.id,
+                'title': task.title,
+                'startDate': task.start_date.isoformat(),
+                'endDate': task.end_date.isoformat(),
+                'color': task.color,
+                'isImportant': task.is_important
+            }
+            if task.description:
+                task_data['description'] = task.description
+            
+            return JsonResponse(task_data, status=201)
+            
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+    
+    # Invalid method
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@csrf_exempt
+@add_cors_headers
+def task_detail_api(request, task_id):
+    """API endpoint for individual task operations"""
+    if request.method == 'OPTIONS':
+        return JsonResponse({'status': 'ok'})
+    
+    # Check if user is authenticated either via session or token
+    user = None
+    if request.user.is_authenticated:
+        user = request.user
+    else:
+        # Check for token authentication
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if auth_header.startswith('Token '):
+            token_key = auth_header.split(' ')[1]
+            # Validate token and get user
+            try:
+                token = Token.objects.get(key=token_key)
+                user = token.user
+            except Token.DoesNotExist:
+                pass
+    
+    if not user:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    try:
+        task = Task.objects.get(id=task_id, user=user)
+    except Task.DoesNotExist:
+        return JsonResponse({'error': 'Task not found'}, status=404)
+    
+    # Get task details
+    if request.method == 'GET':
+        task_data = {
+            'id': task.id,
+            'title': task.title,
+            'startDate': task.start_date.isoformat(),
+            'endDate': task.end_date.isoformat(),
+            'color': task.color,
+            'isImportant': task.is_important
+        }
+        if task.description:
+            task_data['description'] = task.description
+        return JsonResponse(task_data)
+    
+    # Update task
+    elif request.method == 'PUT':
+        try:
+            data = json.loads(request.body)
+            
+            if 'title' in data:
+                task.title = data['title']
+            if 'description' in data:
+                task.description = data['description'] if data['description'] else None
+            if 'startDate' in data:
+                task.start_date = datetime.fromisoformat(data['startDate'].replace('Z', '+00:00'))
+            if 'endDate' in data:
+                task.end_date = datetime.fromisoformat(data['endDate'].replace('Z', '+00:00'))
+            if 'color' in data:
+                task.color = data['color']
+            if 'isImportant' in data:
+                task.is_important = data['isImportant']
+            
+            task.save()
+            
+            # Update user's daily events JSON
+            update_user_daily_events_json(user)
+            
+            return JsonResponse({
+                'id': task.id,
+                'title': task.title,
+                'startDate': task.start_date.isoformat(),
+                'endDate': task.end_date.isoformat(),
+                'color': task.color,
+                'isImportant': task.is_important
+            })
+            
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+    
+    # Delete task
+    elif request.method == 'DELETE':
+        task.delete()
+        
+        # Update user's daily events JSON
+        update_user_daily_events_json(user)
+        
+        return JsonResponse({'status': 'success'})
+    
+    # Invalid method
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+def update_user_daily_events_json(user):
+    """
+    Update the user's daily events JSON in their profile.
+    This function collects all tasks for the user and stores them as JSON.
+    """
+    try:
+        # Get all tasks for the user
+        tasks = Task.objects.filter(user=user)
+        tasks_data = []
+        
+        for task in tasks:
+            tasks_data.append({
+                'id': task.id,
+                'title': task.title,
+                'startDate': task.start_date.isoformat(),
+                'endDate': task.end_date.isoformat(),
+                'color': task.color,
+                'isImportant': task.is_important,
+                'createdAt': task.created_at.isoformat() if task.created_at else None,
+                'updatedAt': task.updated_at.isoformat() if task.updated_at else None
+            })
+        
+        # Get or create user profile
+        user_profile, created = UserProfile.objects.get_or_create(user=user)
+        
+        # Update the JSON field
+        user_profile.daily_events_json = json.dumps(tasks_data, indent=2)
+        user_profile.save()
+        
+    except Exception as e:
+        # Log the error but don't fail the request
+        print(f"Error updating user daily events JSON: {e}")
+        pass
+
+
+@csrf_exempt
+@add_cors_headers
+def user_daily_events_api(request):
+    """API endpoint to get user's daily events as JSON"""
+    if request.method == 'OPTIONS':
+        return JsonResponse({'status': 'ok'})
+    
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    try:
+        # Get or create user profile
+        user_profile, created = UserProfile.objects.get_or_create(user=request.user)
+        
+        # If there's no JSON data, create it
+        if not user_profile.daily_events_json:
+            update_user_daily_events_json(request.user)
+        
+        # Parse the JSON data
+        events_data = json.loads(user_profile.daily_events_json) if user_profile.daily_events_json else []
+        
+        return JsonResponse({'events': events_data})
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
 
 def login_view(request):
     if request.method == 'POST':
@@ -270,6 +521,9 @@ def api_login(request):
             if user is not None:
                 login(request, user)
                 
+                # Get or create auth token for the user
+                token, created = Token.objects.get_or_create(user=user)
+                
                 # Check if user has a profile
                 is_v2ray_admin = False
                 has_v2ray_access = True  # Default value
@@ -280,7 +534,7 @@ def api_login(request):
                 # Return user data and token
                 return JsonResponse({
                     'status': 'success',
-                    'token': 'dummy_token',  # In production, use proper token generation
+                    'token': token.key,
                     'user': {
                         'id': str(user.id),
                         'username': user.username,
@@ -427,9 +681,11 @@ def api_update_profile(request):
             
             token = auth_header.split(' ')[1]
             
-            # For now, we'll use a simple token check
-            # In production, implement proper token validation
-            if token != 'dummy_token':
+            # Validate token and get user
+            try:
+                token = Token.objects.get(key=token_key)
+                user = token.user
+            except Token.DoesNotExist:
                 return JsonResponse({
                     'status': 'error',
                     'message': 'Invalid token'
@@ -444,14 +700,8 @@ def api_update_profile(request):
                     'message': 'Name cannot be empty'
                 }, status=400)
             
-            # For now, we'll update the first user we find
-            # In production, get user from token
-            user = User.objects.first()
-            if not user:
-                return JsonResponse({
-                    'status': 'error',
-                    'message': 'User not found'
-                }, status=404)
+            # The user is already obtained from the token
+            # No need to fetch user again
             
             # Update user name
             if name:
@@ -854,49 +1104,57 @@ def api_update_admin_status(request):
         'message': 'Invalid request method'
     }, status=405)
 
-@login_required
-def v2ray_page(request):
-    """
-    Dedicated V2Ray page with client/admin tabs
-    """
-    # Check if user is V2Ray admin
-    is_v2ray_admin = False
-    if hasattr(request.user, 'profile'):
-        is_v2ray_admin = request.user.profile.is_v2ray_admin
-    
-    # Get all v2ray configurations
-    configs = V2RayConfig.objects.all()
-    
-    # Get all config files
-    config_files = ConfigFile.objects.all()
-    
-    return render(request, 'tickets/v2ray_page.html', {
-        'configs': configs,
-        'config_files': config_files,
-        'is_v2ray_admin': is_v2ray_admin,
-        'has_v2ray_access': True,  # Always allow access
-        'user': request.user  # Add user to context for debugging
-    })
 
-@login_required
+@csrf_exempt
+@add_cors_headers
+def v2ray_page(request):
+    """V2Ray configuration page"""
+    if request.method == 'GET':
+        try:
+            # Check if user has V2Ray access
+            has_v2ray_access = True
+            if hasattr(request.user, 'profile'):
+                has_v2ray_access = request.user.profile.has_v2ray_access
+            
+            if not has_v2ray_access:
+                return render(request, 'tickets/no_v2ray_access.html')
+            
+            # Get all v2ray configurations
+            configs = V2RayConfig.objects.all()
+            
+            return render(request, 'tickets/v2ray_page.html', {
+                'configs': configs,
+                'has_v2ray_access': has_v2ray_access
+            })
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+@csrf_exempt
+@add_cors_headers
 def debug_v2ray(request):
-    """
-    Debug page for V2Ray access
-    """
-    # Check if user has V2Ray access
-    has_v2ray_access = True
-    if hasattr(request.user, 'profile'):
-        has_v2ray_access = request.user.profile.has_v2ray_access
+    """Debug V2Ray configuration page"""
+    if request.method == 'GET':
+        try:
+            # Check if user is admin
+            is_admin = request.user.is_staff
+            
+            if not is_admin:
+                return render(request, 'tickets/no_v2ray_access.html')
+            
+            # Get all v2ray configurations
+            configs = V2RayConfig.objects.all()
+            
+            return render(request, 'tickets/debug_v2ray.html', {
+                'configs': configs,
+                'is_admin': is_admin
+            })
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
     
-    # Check if user is V2Ray admin
-    is_v2ray_admin = False
-    if hasattr(request.user, 'profile'):
-        is_v2ray_admin = request.user.profile.is_v2ray_admin
-    
-    return render(request, 'tickets/debug_v2ray.html', {
-        'is_v2ray_admin': is_v2ray_admin,
-        'user': request.user
-    })
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 @csrf_exempt
 @add_cors_headers
@@ -953,6 +1211,7 @@ def api_permanent_notes(request):
     
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
+
 @csrf_exempt
 @add_cors_headers
 def api_permanent_note_detail(request, note_id):
@@ -1000,4 +1259,152 @@ def api_permanent_note_detail(request, note_id):
         note.delete()
         return JsonResponse({'message': 'Note deleted successfully'})
     
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@csrf_exempt
+@add_cors_headers
+def checklist_api(request):
+    """
+    API endpoint for checklist items.
+    GET: Retrieve all checklist items for the authenticated user
+    POST: Create a new checklist item for the authenticated user
+    """
+    # Check if user is authenticated either via session or token
+    user = None
+    if request.user.is_authenticated:
+        user = request.user
+    else:
+        # Check for token authentication
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if auth_header.startswith('Token '):
+            token_key = auth_header.split(' ')[1]
+            # Validate token and get user
+            try:
+                token = Token.objects.get(key=token_key)
+                user = token.user
+            except Token.DoesNotExist:
+                pass
+
+    if not user:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    # Get all checklist items for the authenticated user
+    if request.method == 'GET':
+        checklist_items = ChecklistItem.objects.filter(user=user)
+        items_data = []
+        
+        for item in checklist_items:
+            items_data.append({
+                'id': item.id,
+                'text': item.text,
+                'completed': item.completed,
+                'created_at': item.created_at.isoformat() if item.created_at else None,
+                'updated_at': item.updated_at.isoformat() if item.updated_at else None
+            })
+        
+        return JsonResponse({'checklist_items': items_data})
+    
+    # Create a new checklist item
+    elif request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            
+            # Create new checklist item
+            checklist_item = ChecklistItem(
+                user=user,
+                text=data.get('text', ''),
+                completed=data.get('completed', False)
+            )
+            
+            checklist_item.save()
+            
+            item_data = {
+                'id': checklist_item.id,
+                'text': checklist_item.text,
+                'completed': checklist_item.completed,
+                'created_at': checklist_item.created_at.isoformat() if checklist_item.created_at else None,
+                'updated_at': checklist_item.updated_at.isoformat() if checklist_item.updated_at else None
+            }
+            
+            return JsonResponse(item_data, status=201)
+            
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+    
+    # Invalid method
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@csrf_exempt
+@add_cors_headers
+def checklist_item_api(request, item_id):
+    """
+    API endpoint for individual checklist item operations.
+    GET: Retrieve a specific checklist item
+    PUT: Update a specific checklist item
+    DELETE: Delete a specific checklist item
+    """
+    # Check if user is authenticated either via session or token
+    user = None
+    if request.user.is_authenticated:
+        user = request.user
+    else:
+        # Check for token authentication
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if auth_header.startswith('Token '):
+            token_key = auth_header.split(' ')[1]
+            # Validate token and get user
+            try:
+                token = Token.objects.get(key=token_key)
+                user = token.user
+            except Token.DoesNotExist:
+                pass
+
+    if not user:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    try:
+        checklist_item = ChecklistItem.objects.get(id=item_id, user=user)
+    except ChecklistItem.DoesNotExist:
+        return JsonResponse({'error': 'Checklist item not found'}, status=404)
+    
+    # Get checklist item details
+    if request.method == 'GET':
+        item_data = {
+            'id': checklist_item.id,
+            'text': checklist_item.text,
+            'completed': checklist_item.completed,
+            'created_at': checklist_item.created_at.isoformat() if checklist_item.created_at else None,
+            'updated_at': checklist_item.updated_at.isoformat() if checklist_item.updated_at else None
+        }
+        return JsonResponse(item_data)
+    
+    # Update checklist item
+    elif request.method == 'PUT':
+        try:
+            data = json.loads(request.body)
+            
+            if 'text' in data:
+                checklist_item.text = data['text']
+            if 'completed' in data:
+                checklist_item.completed = data['completed']
+            
+            checklist_item.save()
+            
+            return JsonResponse({
+                'id': checklist_item.id,
+                'text': checklist_item.text,
+                'completed': checklist_item.completed,
+                'created_at': checklist_item.created_at.isoformat() if checklist_item.created_at else None,
+                'updated_at': checklist_item.updated_at.isoformat() if checklist_item.updated_at else None
+            })
+            
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+    
+    # Delete checklist item
+    elif request.method == 'DELETE':
+        checklist_item.delete()
+        return JsonResponse({'status': 'success'})
+    
+    # Invalid method
     return JsonResponse({'error': 'Method not allowed'}, status=405)

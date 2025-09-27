@@ -2,11 +2,14 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
+import secrets
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     is_v2ray_admin = models.BooleanField(default=False, help_text="User can manage V2Ray configurations")
     has_v2ray_access = models.BooleanField(default=True, help_text="User can access V2Ray page and features")
+    daily_events_json = models.TextField(blank=True, null=True, help_text="JSON representation of user's daily calendar events")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -17,11 +20,33 @@ class UserProfile(models.Model):
         verbose_name = "User Profile"
         verbose_name_plural = "User Profiles"
 
+class Token(models.Model):
+    key = models.CharField(max_length=40, unique=True)
+    user = models.OneToOneField(User, related_name='auth_token', on_delete=models.CASCADE)
+    created = models.DateTimeField(auto_now_add=True)
+    
+    def save(self, *args, **kwargs):
+        if not self.key:
+            self.key = self.generate_key()
+        return super().save(*args, **kwargs)
+    
+    def generate_key(self):
+        return secrets.token_urlsafe(32)
+    
+    def __str__(self):
+        return self.key
+
 # Signal to create UserProfile automatically when User is created
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     if created:
         UserProfile.objects.create(user=instance)
+
+# Signal to create Token automatically when User is created
+@receiver(post_save, sender=User)
+def create_auth_token(sender, instance, created, **kwargs):
+    if created:
+        Token.objects.create(user=instance)
 
 # Signal to save UserProfile when User is saved
 @receiver(post_save, sender=User)
@@ -93,3 +118,47 @@ class PermanentNote(models.Model):
         ordering = ['-created_at']
         verbose_name = "Permanent Note"
         verbose_name_plural = "Permanent Notes"
+
+class Task(models.Model):
+    COLOR_CHOICES = [
+        ('blue', 'Blue'),
+        ('green', 'Green'),
+        ('red', 'Red'),
+        ('yellow', 'Yellow'),
+        ('purple', 'Purple'),
+        ('orange', 'Orange'),
+        ('gray', 'Gray'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tasks')
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, null=True)
+    start_date = models.DateTimeField()
+    end_date = models.DateTimeField()
+    color = models.CharField(max_length=20, choices=COLOR_CHOICES, default='blue')
+    is_important = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.title} - {self.user.username}"
+    
+    class Meta:
+        ordering = ['start_date']
+        verbose_name = "Task"
+        verbose_name_plural = "Tasks"
+
+class ChecklistItem(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='checklist_items')
+    text = models.CharField(max_length=500)
+    completed = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.text} - {self.user.username}"
+    
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = "Checklist Item"
+        verbose_name_plural = "Checklist Items"

@@ -6,6 +6,9 @@ import {
   Download,
   Upload,
   Plus,
+  Bell,
+  BellOff,
+  Trash,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,38 +19,201 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface CalendarEvent {
   id: string;
   title: string;
+  description?: string;
   startDate: string;
   endDate: string;
   color: "blue" | "green" | "red" | "yellow" | "purple" | "orange" | "gray";
+  isImportant?: boolean;
 }
 
-const mockEvents: CalendarEvent[] = [
-  {
-    id: "1",
-    title: "Team Meeting",
-    startDate: new Date(new Date().setHours(10, 0, 0, 0)).toISOString(),
-    endDate: new Date(new Date().setHours(11, 30, 0, 0)).toISOString(),
-    color: "blue",
-  },
-  {
-    id: "2",
-    title: "Lunch with Client",
-    startDate: new Date(new Date().setHours(13, 0, 0, 0)).toISOString(),
-    endDate: new Date(new Date().setHours(14, 0, 0, 0)).toISOString(),
-    color: "green",
-  },
-  {
-    id: "3",
-    title: "Project Deadline",
-    startDate: new Date(new Date().setHours(15, 0, 0, 0)).toISOString(),
-    endDate: new Date(new Date().setHours(16, 0, 0, 0)).toISOString(),
-    color: "red",
-  },
-];
+// API functions for tasks
+const API_URL = "http://localhost:8000/tickets/api";
+
+const fetchTasks = async (token?: string): Promise<CalendarEvent[]> => {
+  try {
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+    };
+    
+    if (token) {
+      headers["Authorization"] = `Token ${token}`;
+    }
+
+    const response = await fetch(`${API_URL}/tasks/`, {
+      method: "GET",
+      headers,
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch tasks");
+    }
+
+    const data = await response.json();
+    return data.tasks || [];
+  } catch (error) {
+    console.error("Error fetching tasks:", error);
+    return [];
+  }
+};
+
+const createTask = async (task: Omit<CalendarEvent, "id">, token?: string): Promise<CalendarEvent | null> => {
+  try {
+    console.log("Creating task with data:", task);
+    
+    const taskWithImportance = {
+      ...task,
+      isImportant: Boolean(task.isImportant), // Ensure boolean value is sent
+    };
+
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+    };
+    
+    if (token) {
+      headers["Authorization"] = `Token ${token}`;
+    }
+    
+    const response = await fetch(`${API_URL}/tasks/`, {
+      method: "POST",
+      headers,
+      credentials: "include",
+      body: JSON.stringify(taskWithImportance),
+    });
+
+    console.log("Create task response status:", response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Create task failed:", errorText);
+      throw new Error(`Failed to create task: ${response.status} ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log("Create task result:", result);
+    return result;
+  } catch (error) {
+    console.error("Error creating task:", error);
+    return null;
+  }
+};
+
+const updateTask = async (task: CalendarEvent, token?: string): Promise<CalendarEvent | null> => {
+  try {
+    // Ensure we have a valid ID for the API call
+    if (!task.id) {
+      console.error("Task ID is missing");
+      return null;
+    }
+    
+    const taskWithImportance = {
+      ...task,
+      isImportant: Boolean(task.isImportant), // Ensure boolean value is sent
+    };
+
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+    };
+    
+    if (token) {
+      headers["Authorization"] = `Token ${token}`;
+    }
+    
+    // Use the original string ID for the API call
+    const response = await fetch(`${API_URL}/tasks/${task.id}/`, {
+      method: "PUT",
+      headers,
+      credentials: "include",
+      body: JSON.stringify(taskWithImportance),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to update task");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error updating task:", error);
+    return null;
+  }
+};
+
+const deleteTask = async (taskId: string, token?: string): Promise<boolean> => {
+  try {
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+    };
+    
+    if (token) {
+      headers["Authorization"] = `Token ${token}`;
+    }
+    
+    const response = await fetch(`${API_URL}/tasks/${taskId}/`, {
+      method: "DELETE",
+      headers,
+      credentials: "include",
+    });
+
+    return response.ok;
+  } catch (error) {
+    console.error("Error deleting task:", error);
+    return false;
+  }
+};
+
+// Function to fetch all events from the database
+const fetchAllEvents = async (token?: string): Promise<CalendarEvent[]> => {
+  try {
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+    };
+    
+    if (token) {
+      headers["Authorization"] = `Token ${token}`;
+    }
+    
+    const response = await fetch(`${API_URL}/tasks/`, {
+      method: "GET",
+      headers,
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch events");
+    }
+
+    const data = await response.json();
+    console.log("Fetched events:", data);
+    
+    // Handle the case where the API returns {tasks: []} instead of just an array
+    if (data && data.tasks && Array.isArray(data.tasks)) {
+      return data.tasks;
+    } else if (Array.isArray(data)) {
+      return data;
+    } else {
+      console.error("Unexpected data format:", data);
+      return [];
+    }
+  } catch (error) {
+    console.error("Error fetching events:", error);
+    return [];
+  }
+};
+
+// Initial empty events array
+const initialEvents: CalendarEvent[] = [];
 
 const EventEditor: React.FC<{
   event: CalendarEvent | null;
@@ -55,8 +221,10 @@ const EventEditor: React.FC<{
   onCancel: () => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}> = ({ event, onSave, onCancel, open, onOpenChange }) => {
+  token?: string; // Add token prop
+}> = ({ event, onSave, onCancel, open, onOpenChange, token }) => {
   const [title, setTitle] = React.useState(event?.title || "");
+  const [description, setDescription] = React.useState(event?.description || "");
   const [startTime, setStartTime] = React.useState(
     event ? format(parseISO(event.startDate), "HH:mm") : "09:00"
   );
@@ -66,20 +234,26 @@ const EventEditor: React.FC<{
   const [color, setColor] = React.useState<CalendarEvent["color"]>(
     event?.color || "blue"
   );
+  const [isImportant, setIsImportant] = React.useState(event?.isImportant || false);
+  const [isSaving, setIsSaving] = React.useState(false);
 
   React.useEffect(() => {
     if (event) {
       setTitle(event.title);
+      setDescription(event.description || "");
       setStartTime(format(parseISO(event.startDate), "HH:mm"));
       setEndTime(format(parseISO(event.endDate), "HH:mm"));
       setColor(event.color);
+      setIsImportant(event.isImportant || false);
     }
   }, [event]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!event) return;
+
+    setIsSaving(true);
 
     const [startHours, startMinutes] = startTime.split(":").map(Number);
     const [endHours, endMinutes] = endTime.split(":").map(Number);
@@ -90,17 +264,24 @@ const EventEditor: React.FC<{
     const endDate = new Date(parseISO(event.endDate));
     endDate.setHours(endHours, endMinutes, 0, 0);
 
-    onSave({
-      ...event,
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
-      color,
-    });
+    try {
+      await onSave({
+        ...event,
+        title,
+        description: description || undefined,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        color,
+        isImportant,
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Event</DialogTitle>
         </DialogHeader>
@@ -119,34 +300,44 @@ const EventEditor: React.FC<{
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">
-                Start Time
-              </label>
-              <Input
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+              <label className="block text-sm font-medium mb-1">Description</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full border rounded px-3 py-2 text-sm"
+                rows={3}
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-1">End Time</label>
-              <Input
-                type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
-              />
+            <div className="flex gap-2">
+              <div>
+                <label className="block text-sm font-medium mb-1">Start Time</label>
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="w-full border rounded px-3 py-2 text-sm"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">End Time</label>
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="w-full border rounded px-3 py-2 text-sm"
+                  required
+                />
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium mb-1">Color</label>
               <select
                 value={color}
-                onChange={(e) =>
-                  setColor(e.target.value as CalendarEvent["color"])
-                }
+                onChange={(e) => setColor(e.target.value as CalendarEvent["color"])}
                 className="w-full border rounded px-3 py-2 text-sm"
               >
                 <option value="blue">Blue</option>
@@ -158,17 +349,218 @@ const EventEditor: React.FC<{
                 <option value="gray">Gray</option>
               </select>
             </div>
-          </div>
 
-          <div className="flex justify-end space-x-2 mt-6">
-            <Button type="button" variant="outline" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button type="submit">Save</Button>
+            <div className="flex items-center">
+              <Checkbox
+                checked={isImportant}
+                onCheckedChange={(checked) => setIsImportant(checked)}
+              />
+              <label className="ml-2 text-sm font-medium">Important</label>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" onClick={onCancel} disabled={isSaving}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? "Saving..." : "Save"}
+              </Button>
+            </div>
           </div>
         </form>
       </DialogContent>
     </Dialog>
+  );
+};
+
+// Checklist Component
+const ChecklistComponent: React.FC<{
+  events: CalendarEvent[];
+  setEvents: React.Dispatch<React.SetStateAction<CalendarEvent[]>>;
+  token?: string;
+}> = ({ events, setEvents, token }) => {
+  const [checklistItems, setChecklistItems] = React.useState<Array<{id: number; text: string; completed: boolean}>>([]);
+  const [newItemText, setNewItemText] = React.useState("");
+  const [loading, setLoading] = React.useState(true);
+
+  // Fetch checklist items from the backend
+  React.useEffect(() => {
+    const fetchChecklistItems = async () => {
+      console.log("Fetching checklist items with token:", token);
+      try {
+        const headers: HeadersInit = {
+          "Content-Type": "application/json",
+        };
+        
+        if (token) {
+          headers["Authorization"] = `Token ${token}`;
+          console.log("Setting Authorization header:", headers["Authorization"]);
+        } else {
+          console.log("No token provided");
+        }
+
+        const response = await fetch("http://localhost:8000/tickets/api/checklist/", {
+          method: "GET",
+          headers,
+          credentials: "include",
+        });
+
+        if (!response.ok) {
+          console.error("Response not ok:", response.status, response.statusText);
+          const errorData = await response.text();
+          console.error("Error response:", errorData);
+          throw new Error("Failed to fetch checklist items");
+        }
+
+        const data = await response.json();
+        setChecklistItems(data.checklist_items || []);
+      } catch (error) {
+        console.error("Error fetching checklist items:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (token) {
+      fetchChecklistItems();
+    }
+  }, [token]);
+
+  const addChecklistItem = async () => {
+    if (newItemText.trim() !== "") {
+      try {
+        const headers: HeadersInit = {
+          "Content-Type": "application/json",
+        };
+        
+        if (token) {
+          headers["Authorization"] = `Token ${token}`;
+        }
+        
+        const response = await fetch("http://localhost:8000/tickets/api/checklist/", {
+          method: "POST",
+          headers,
+          credentials: "include",
+          body: JSON.stringify({
+            text: newItemText,
+            completed: false
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to create checklist item");
+        }
+
+        const newItem = await response.json();
+        setChecklistItems([...checklistItems, newItem]);
+        setNewItemText("");
+      } catch (error) {
+        console.error("Error creating checklist item:", error);
+      }
+    }
+  };
+
+  const toggleChecklistItem = async (id: number) => {
+    try {
+      const item = checklistItems.find(item => item.id === id);
+      if (!item) return;
+      
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+      
+      if (token) {
+        headers["Authorization"] = `Token ${token}`;
+      }
+      
+      const response = await fetch(`http://localhost:8000/tickets/api/checklist/${id}/`, {
+        method: "PUT",
+        headers,
+        credentials: "include",
+        body: JSON.stringify({
+          ...item,
+          completed: !item.completed
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update checklist item");
+      }
+
+      const updatedItem = await response.json();
+      setChecklistItems(checklistItems.map(item => 
+        item.id === id ? updatedItem : item
+      ));
+    } catch (error) {
+      console.error("Error updating checklist item:", error);
+    }
+  };
+
+  const deleteChecklistItem = async (id: number) => {
+    try {
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+      
+      if (token) {
+        headers["Authorization"] = `Token ${token}`;
+      }
+      
+      const response = await fetch(`http://localhost:8000/tickets/api/checklist/${id}/`, {
+        method: "DELETE",
+        headers,
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete checklist item");
+      }
+
+      setChecklistItems(checklistItems.filter(item => item.id !== id));
+    } catch (error) {
+      console.error("Error deleting checklist item:", error);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      addChecklistItem();
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        <Input
+          type="text"
+          value={newItemText}
+          onChange={(e) => setNewItemText(e.target.value)}
+          onKeyPress={handleKeyPress}
+          placeholder="Add a new item"
+          className="w-full"
+        />
+        <Button onClick={addChecklistItem}>Add</Button>
+      </div>
+
+      {loading ? (
+        <div>Loading...</div>
+      ) : (
+        <div className="space-y-2">
+          {checklistItems.map(item => (
+            <div key={item.id} className="flex items-center gap-2">
+              <Checkbox
+                checked={item.completed}
+                onCheckedChange={() => toggleChecklistItem(item.id)}
+              />
+              <span className={item.completed ? "line-through" : ""}>{item.text}</span>
+              <Button variant="ghost" onClick={() => deleteChecklistItem(item.id)}>
+                <Trash className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -179,16 +571,31 @@ const EventCreator: React.FC<{
   tempEvent?: CalendarEvent | null;
 }> = ({ selectedDate, onSave, onCancel, tempEvent }) => {
   const [title, setTitle] = React.useState("");
+  const [description, setDescription] = React.useState("");
   const [startTime, setStartTime] = React.useState(
     tempEvent ? format(parseISO(tempEvent.startDate), "HH:mm") : "09:00"
   );
   const [endTime, setEndTime] = React.useState(
     tempEvent ? format(parseISO(tempEvent.endDate), "HH:mm") : "10:00"
   );
-  const [color, setColor] = React.useState("blue");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Update times when tempEvent changes
+  React.useEffect(() => {
+    if (tempEvent) {
+      setTitle(tempEvent.title);
+      setDescription(tempEvent.description || "");
+      setStartTime(format(parseISO(tempEvent.startDate), "HH:mm"));
+      setEndTime(format(parseISO(tempEvent.endDate), "HH:mm"));
+    }
+  }, [tempEvent]);
+  const [color, setColor] = React.useState("blue");
+  const [isImportant, setIsImportant] = React.useState(false);
+  const [isCreating, setIsCreating] = React.useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    setIsCreating(true);
 
     // Combine selected date with time values
     const [startHours, startMinutes] = startTime.split(":").map(Number);
@@ -201,81 +608,110 @@ const EventCreator: React.FC<{
     endDate.setHours(endHours, endMinutes, 0, 0);
 
     const newEvent: CalendarEvent = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: tempEvent ? tempEvent.id : Math.random().toString(36).substr(2, 9),
       title,
+      description: description || undefined,
       startDate: startDate.toISOString(),
       endDate: endDate.toISOString(),
       color: color as CalendarEvent["color"],
+      isImportant,
     };
 
-    onSave(newEvent);
+    console.log("EventCreator submitting event:", newEvent);
+    console.log("tempEvent was:", tempEvent);
+
+    try {
+      await onSave(newEvent);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   return (
-    <DialogContent>
-      <DialogHeader>
-        <DialogTitle>Create New Event</DialogTitle>
-      </DialogHeader>
-
-      <form onSubmit={handleSubmit}>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Title</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full border rounded px-3 py-2 text-sm"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Start Time</label>
-            <Input
-              type="time"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">End Time</label>
-            <Input
-              type="time"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-              className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Color</label>
-            <select
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              className="w-full border rounded px-3 py-2 text-sm"
-            >
-              <option value="blue">Blue</option>
-              <option value="green">Green</option>
-              <option value="red">Red</option>
-              <option value="yellow">Yellow</option>
-              <option value="purple">Purple</option>
-              <option value="orange">Orange</option>
-              <option value="gray">Gray</option>
-            </select>
-          </div>
+    <form onSubmit={handleSubmit}>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">Title</label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full border rounded px-3 py-2 text-sm"
+            required
+          />
         </div>
 
-        <div className="flex justify-end space-x-2 mt-6">
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button type="submit">Create Event</Button>
+        <div>
+          <label className="block text-sm font-medium mb-1">Description</label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="w-full border rounded px-3 py-2 text-sm"
+            rows={3}
+          />
         </div>
-      </form>
-    </DialogContent>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Start Time</label>
+          <Input
+            type="time"
+            value={startTime}
+            onChange={(e) => setStartTime(e.target.value)}
+            className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">End Time</label>
+          <Input
+            type="time"
+            value={endTime}
+            onChange={(e) => setEndTime(e.target.value)}
+            className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Color</label>
+          <select
+            value={color}
+            onChange={(e) => setColor(e.target.value)}
+            className="w-full border rounded px-3 py-2 text-sm"
+          >
+            <option value="blue">Blue</option>
+            <option value="green">Green</option>
+            <option value="red">Red</option>
+            <option value="yellow">Yellow</option>
+            <option value="purple">Purple</option>
+            <option value="orange">Orange</option>
+            <option value="gray">Gray</option>
+          </select>
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="is-important-create"
+            checked={isImportant}
+            onCheckedChange={(checked) => setIsImportant(checked as boolean)}
+          />
+          <label 
+            htmlFor="is-important-create" 
+            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          >
+            Is Important
+          </label>
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 mt-6">
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isCreating} className="w-full sm:w-auto">
+          Cancel
+        </Button>
+        <Button type="submit" disabled={isCreating} className="w-full sm:w-auto">
+          {isCreating ? "Creating..." : "Create Event"}
+        </Button>
+      </div>
+    </form>
   );
 };
 
@@ -298,8 +734,9 @@ const EventBlock: React.FC<{
   onDelete: (id: string) => void;
   position: { left: number; width: number };
   isDraggingId: string | null;
+  isSavingId: string | null;
 }> = React.memo(
-  ({ event, onMove, onResize, onEdit, onDelete, position, isDraggingId }) => {
+  ({ event, onMove, onResize, onEdit, onDelete, position, isDraggingId, isSavingId }) => {
     const start = React.useMemo(
       () => parseISO(event.startDate),
       [event.startDate]
@@ -313,6 +750,7 @@ const EventBlock: React.FC<{
       () => (durationInMinutes / 60) * 48 - 4,
       [durationInMinutes]
     );
+
 
     const isDragging = React.useRef(false);
 
@@ -341,6 +779,8 @@ const EventBlock: React.FC<{
       y: number;
     } | null>(null);
     const [showDelete, setShowDelete] = React.useState(false);
+    // State for hover effect
+    const [isHovered, setIsHovered] = React.useState(false);
 
     const handleDragStart = (e: React.MouseEvent) => {
       if (showDelete) return;
@@ -688,100 +1128,128 @@ const EventBlock: React.FC<{
     };
 
     return (
-      <div
-        className={`absolute rounded border px-1 py-0.5 text-xs truncate cursor-move select-none event-block ${
-          colorClasses[event.color]
-        } ${isTouchDragging ? "shadow-lg scale-105" : ""}`}
-        style={{
-          height: `${heightInPixels}px`,
-          top: `${(start.getMinutes() / 60) * 48}px`,
-          left: `${position.left}%`,
-          width: `${position.width}%`,
-          zIndex: isDraggingId === event.id || isTouchDragging ? 50 : 10,
-        }}
-        onMouseDown={handleSwipeStart}
-        onDoubleClick={handleDoubleClick}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchCancel}
-      >
-        {showDelete ? (
-          <div className="flex items-center justify-center h-full">
-            <button
-              onClick={handleDelete}
-              className="px-2 py-1 bg-red-500 text-white rounded text-xs"
-            >
-              Delete
-            </button>
-          </div>
-        ) : (
-          <>
-            {longPressProgress > 0 && longPressProgress < 100 && (
-              <div className="absolute top-1 right-1 w-4 h-4">
-                <svg
-                  className="w-4 h-4 transform -rotate-90"
-                  viewBox="0 0 16 16"
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            className={`absolute rounded border px-1 py-0.5 text-xs truncate cursor-move select-none event-block ${
+              colorClasses[event.color]
+            } ${isTouchDragging ? "shadow-lg scale-105" : ""}`}
+            style={{
+              height: `${heightInPixels}px`,
+              top: `${(start.getMinutes() / 60) * 48}px`,
+              left: `${position.left}%`,
+              width: `${position.width}%`,
+              zIndex: isDraggingId === event.id || isTouchDragging ? 50 : 10,
+            }}
+            onMouseDown={handleSwipeStart}
+            onDoubleClick={handleDoubleClick}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchCancel}
+          >
+            {showDelete ? (
+              <div className="flex items-center justify-center h-full">
+                <button
+                  onClick={handleDelete}
+                  className="px-2 py-1 bg-red-500 text-white rounded text-xs"
                 >
-                  <circle
-                    cx="8"
-                    cy="8"
-                    r="6"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    fill="none"
-                    strokeDasharray={`${longPressProgress * 0.377} 3.77`}
-                    className="opacity-60"
-                  />
-                </svg>
+                  Delete
+                </button>
               </div>
-            )}
-
-            <div
-              className="h-2.5 w-full bg-current opacity-20 cursor-move flex items-center justify-center mb-0.5 rounded-t"
-              onMouseDown={handleEventMouseDown}
-            >
-              <div className="w-8 h-0.5 bg-white rounded-full"></div>
-            </div>
-
-            <div
-              className="h-[calc(100%-0.75rem)] w-full"
-              onDoubleClick={handleDoubleClick}
-            >
-              {heightInPixels < 55 ? (
-                <div className="flex items-center justify-between text-[0.65rem]">
-                  <span className="font-medium truncate flex-1">
-                    {event.title}
-                  </span>
-                  <span className="whitespace-nowrap ml-1 opacity-80">
-                    {format(start, "HH:mm")}-{format(end, "HH:mm")}
-                  </span>
-                </div>
-              ) : (
-                <>
-                  <div className="font-medium truncate">{event.title}</div>
-                  <div
-                    className={`${
-                      heightInPixels < 30
-                        ? "flex justify-between text-[0.6rem]"
-                        : ""
-                    }`}
-                  >
-                    <span>{format(start, "HH:mm")}</span>
-                    {heightInPixels < 30 ? <span>-</span> : " - "}
-                    <span>{format(end, "HH:mm")}</span>
+            ) : (
+              <>
+                {longPressProgress > 0 && longPressProgress < 100 && (
+                  <div className="absolute top-1 right-1 w-4 h-4">
+                    <svg
+                      className="w-4 h-4 transform -rotate-90"
+                      viewBox="0 0 16 16"
+                    >
+                      <circle
+                        cx="8"
+                        cy="8"
+                        r="6"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        fill="none"
+                        strokeDasharray={`${longPressProgress * 0.377} 3.77`}
+                        className="opacity-60"
+                      />
+                    </svg>
                   </div>
-                </>
-              )}
-            </div>
+                )}
 
-            <div
-              className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize bg-current opacity-50"
-              onMouseDown={handleResizeStart}
-            />
-          </>
+                <div
+                  className="h-2.5 w-full bg-current opacity-20 cursor-move flex items-center justify-center mb-0.5 rounded-t"
+                  onMouseDown={handleEventMouseDown}
+                >
+                  <div className="w-8 h-0.5 bg-white rounded-full"></div>
+                </div>
+
+                <div
+                  className="h-[calc(100%-0.75rem)] w-full relative"
+                  onDoubleClick={handleDoubleClick}
+                >
+                  {event.isImportant && (
+                    <div className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center z-10 shadow">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-white" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    </div>
+                  )}
+                  
+                  {heightInPixels < 55 ? (
+                    <div className="flex items-center justify-between text-[0.65rem]">
+                      <span className="font-medium truncate flex-1">
+                        {event.title}
+                      </span>
+                      <span className="whitespace-nowrap ml-1 opacity-80">
+                        {format(start, "HH:mm")}-{format(end, "HH:mm")}
+                      </span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="font-medium truncate">{event.title}</div>
+                      <div
+                        className={`${
+                          heightInPixels < 30
+                            ? "flex justify-between text-[0.6rem]"
+                            : ""
+                        }`}
+                      >
+                        <span>{format(start, "HH:mm")}</span>
+                        {heightInPixels < 30 ? <span>-</span> : " - "}
+                        <span>{format(end, "HH:mm")}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div
+                  className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize bg-current opacity-50"
+                  onMouseDown={handleResizeStart}
+                />
+              </>
+            )}
+          </div>
+        </TooltipTrigger>
+        {event.description && (
+          <TooltipContent 
+            side="right" 
+            align="start"
+            sideOffset={8}
+            alignOffset={0}
+            className="max-w-xs"
+            collisionPadding={5}
+          >
+            <p className="font-medium">{event.title}</p>
+            <p className="text-sm">{event.description}</p>
+            <p className="text-xs opacity-75 mt-1">
+              {format(start, "HH:mm")} - {format(end, "HH:mm")}
+            </p>
+          </TooltipContent>
         )}
-      </div>
+      </Tooltip>
     );
   }
 );
@@ -814,14 +1282,29 @@ const CalendarDayView: React.FC<{
   selectedDate: Date;
   events: CalendarEvent[];
   setEvents: React.Dispatch<React.SetStateAction<CalendarEvent[]>>;
-}> = ({ selectedDate, events, setEvents }) => {
+  token?: string;
+}> = ({ selectedDate, events, setEvents, token }) => {
   const [editingEvent, setEditingEvent] = React.useState<CalendarEvent | null>(
     null
   );
   const [creatingEvent, setCreatingEvent] = React.useState(false);
   const [tempEvent, setTempEvent] = React.useState<CalendarEvent | null>(null);
+  const [currentTime, setCurrentTime] = React.useState(new Date());
+  // Refs to store the latest move/resize data for debouncing
+  const moveTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const resizeTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Update current time every second
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, []);
 
   const moveEvent = (id: string, newStartDate: string, newEndDate: string) => {
+    // Use callback version to ensure we have the most current event data
     setEvents((prevEvents) =>
       prevEvents.map((event) =>
         event.id === id
@@ -832,6 +1315,7 @@ const CalendarDayView: React.FC<{
   };
 
   const resizeEvent = (id: string, newEndDate: string) => {
+    // Use callback version to ensure we have the most current event data
     setEvents((prevEvents) =>
       prevEvents.map((event) =>
         event.id === id ? { ...event, endDate: newEndDate } : event
@@ -839,20 +1323,67 @@ const CalendarDayView: React.FC<{
     );
   };
 
-  const deleteEvent = (id: string) => {
-    setEvents((prevEvents) => prevEvents.filter((event) => event.id !== id));
+  const deleteEvent = async (id: string) => {
+    try {
+      const success = await deleteTask(id, token);
+      if (success) {
+        setEvents((prevEvents) => prevEvents.filter((event) => event.id !== id));
+      }
+    } catch (error) {
+      console.error("Error deleting event:", error);
+    }
   };
 
   const editEvent = (event: CalendarEvent) => {
     setEditingEvent(event);
   };
 
-  const saveEvent = (updatedEvent: CalendarEvent) => {
+  const saveEvent = async (updatedEvent: CalendarEvent) => {
+    // Immediately update the UI with the updated event for instant feedback
     setEvents((prevEvents) =>
       prevEvents.map((event) =>
         event.id === updatedEvent.id ? updatedEvent : event
       )
     );
+    
+    try {
+      console.log("Saving updated event:", updatedEvent);
+      const result = await updateTask(updatedEvent, token);
+      
+      if (result) {
+        // Update the UI with the saved event (in case there are any server-side changes)
+        setEvents((prevEvents) =>
+          prevEvents.map((event) =>
+            event.id === updatedEvent.id ? result : event
+          )
+        );
+        console.log("Event updated successfully:", result);
+      } else {
+        console.error("Failed to update event: No response from server");
+        // Revert to the previous version if save failed
+        setEvents((prevEvents) => {
+          const previousEvent = prevEvents.find(e => e.id === updatedEvent.id);
+          if (previousEvent) {
+            return prevEvents.map((event) =>
+              event.id === updatedEvent.id ? previousEvent : event
+            );
+          }
+          return prevEvents;
+        });
+      }
+    } catch (error) {
+      console.error("Error updating event:", error);
+      // Revert to the previous version if save failed
+      setEvents((prevEvents) => {
+        const previousEvent = prevEvents.find(e => e.id === updatedEvent.id);
+        if (previousEvent) {
+          return prevEvents.map((event) =>
+            event.id === updatedEvent.id ? previousEvent : event
+          );
+        }
+        return prevEvents;
+      });
+    }
     setEditingEvent(null);
   };
 
@@ -929,6 +1460,9 @@ const CalendarDayView: React.FC<{
   const [draggingEventId, setDraggingEventId] = React.useState<string | null>(
     null
   );
+  const [savingEventId, setSavingEventId] = React.useState<string | null>(
+    null
+  );
 
   const handleMoveEvent = (
     id: string,
@@ -937,101 +1471,316 @@ const CalendarDayView: React.FC<{
   ) => {
     setDraggingEventId(id);
     moveEvent(id, newStartDate, newEndDate);
+    
+    // Clear any existing timeout
+    if (moveTimeoutRef.current) {
+      clearTimeout(moveTimeoutRef.current);
+    }
+    
+    // Set a new timeout to save the changes (reduced from 500ms to 200ms for faster response)
+    moveTimeoutRef.current = setTimeout(async () => {
+      await saveMovedEvent(id, newStartDate, newEndDate);
+    }, 200); // Reduced timeout for faster response
+  };
+
+  // Separate function to handle the actual saving logic
+  const saveMovedEvent = async (id: string, newStartDate: string, newEndDate: string) => {
+    // Use the callback version of setEvents to get the most current event data
+    setEvents(currentEvents => {
+      const eventToUpdate = currentEvents.find(event => event.id === id);
+      if (eventToUpdate) {
+        // Check if this is a temporary event (not yet saved to backend)
+        // Temporary events have string IDs generated by Math.random()
+        // Backend-saved events have numeric IDs
+        const isTemporaryEvent = isNaN(Number(eventToUpdate.id));
+        if (isTemporaryEvent) {
+          console.log("Skipping save for temporary event:", eventToUpdate.id);
+          return currentEvents;
+        }
+        
+        // Show saving indicator
+        setSavingEventId(id);
+        
+        // Update the event with new start and end dates
+        const updatedEvent = {
+          ...eventToUpdate,
+          startDate: newStartDate,
+          endDate: newEndDate
+        };
+        
+        // Save to backend asynchronously
+        updateTask(updatedEvent, token).then(result => {
+          if (result) {
+            // Update the UI with the saved event
+            setEvents(prevEvents =>
+              prevEvents.map(event =>
+                event.id === id ? result : event
+              )
+            );
+            console.log("Event moved and saved successfully:", result);
+          } else {
+            console.error("Failed to save moved event");
+          }
+        }).catch(error => {
+          console.error("Error saving moved event:", error);
+        }).finally(() => {
+          // Clear the dragging and saving states
+          setDraggingEventId(null);
+          setSavingEventId(null);
+        });
+        
+        // Return the updated events for immediate UI feedback
+        return currentEvents.map(event =>
+          event.id === id ? updatedEvent : event
+        );
+      }
+      return currentEvents;
+    });
   };
 
   const handleResizeEvent = (id: string, newEndDate: string) => {
     setDraggingEventId(id);
     resizeEvent(id, newEndDate);
+    
+    // Clear any existing timeout
+    if (resizeTimeoutRef.current) {
+      clearTimeout(resizeTimeoutRef.current);
+    }
+    
+    // Set a new timeout to save the changes (reduced from 500ms to 200ms for faster response)
+    resizeTimeoutRef.current = setTimeout(async () => {
+      await saveResizedEvent(id, newEndDate);
+    }, 200); // Reduced timeout for faster response
   };
 
-  const handleCreateEvent = (newEvent: CalendarEvent) => {
-    setEvents((prevEvents) => [...prevEvents, newEvent]);
+  // Separate function to handle the actual saving logic for resize
+  const saveResizedEvent = async (id: string, newEndDate: string) => {
+    // Use the callback version of setEvents to get the most current event data
+    setEvents(currentEvents => {
+      const eventToUpdate = currentEvents.find(event => event.id === id);
+      if (eventToUpdate) {
+        // Check if this is a temporary event (not yet saved to backend)
+        // Temporary events have string IDs generated by Math.random()
+        // Backend-saved events have numeric IDs
+        const isTemporaryEvent = isNaN(Number(eventToUpdate.id));
+        if (isTemporaryEvent) {
+          console.log("Skipping save for temporary event:", eventToUpdate.id);
+          return currentEvents;
+        }
+        
+        // Show saving indicator
+        setSavingEventId(id);
+        
+        // Update the event with new end date
+        const updatedEvent = {
+          ...eventToUpdate,
+          endDate: newEndDate
+        };
+        
+        // Save to backend asynchronously
+        updateTask(updatedEvent, token).then(result => {
+          if (result) {
+            // Update the UI with the saved event
+            setEvents(prevEvents =>
+              prevEvents.map(event =>
+                event.id === id ? result : event
+              )
+            );
+            console.log("Event resized and saved successfully:", result);
+          } else {
+            console.error("Failed to save resized event");
+          }
+        }).catch(error => {
+          console.error("Error saving resized event:", error);
+        }).finally(() => {
+          // Clear the dragging and saving states
+          setDraggingEventId(null);
+          setSavingEventId(null);
+        });
+        
+        // Return the updated events for immediate UI feedback
+        return currentEvents.map(event =>
+          event.id === id ? updatedEvent : event
+        );
+      }
+      return currentEvents;
+    });
+  };
+
+  const handleCreateEvent = async (newEvent: CalendarEvent) => {
+    console.log("Creating new event:", newEvent);
+    try {
+      // Add the temporary event to the UI immediately
+      setEvents((prev) => [...prev, newEvent]);
+      
+      // Remove id to let the backend generate one
+      const { id, ...eventData } = newEvent;
+      console.log("Event data being sent to API:", eventData);
+      
+      // Create the task in the database
+      const createdTask = await createTask(eventData, token || undefined);
+      
+      if (createdTask) {
+        // Update the UI with the newly created task (with the backend-generated ID)
+        setEvents((prev) => 
+          prev.map(event => 
+            event.id === newEvent.id ? createdTask : event
+          )
+        );
+        console.log("Event created successfully:", createdTask);
+      } else {
+        console.error("Failed to create event: No response from server");
+        // If creation failed, remove the temporary event from the UI
+        setEvents((prev) => prev.filter(event => event.id !== newEvent.id));
+      }
+    } catch (error) {
+      console.error("Error creating event:", error);
+      // If creation failed, remove the temporary event from the UI
+      setEvents((prev) => prev.filter(event => event.id !== newEvent.id));
+    }
     setCreatingEvent(false);
     setEditingEvent(null);
   };
 
   React.useEffect(() => {
     const handleMouseUp = () => {
+      // Save any pending changes immediately when mouse is released
+      if (moveTimeoutRef.current) {
+        clearTimeout(moveTimeoutRef.current);
+        moveTimeoutRef.current = null;
+        
+        // If there was a pending move operation, save it immediately
+        if (draggingEventId) {
+          const movedEvent = events.find(event => event.id === draggingEventId);
+          if (movedEvent) {
+            // Use the current event data from state (which was updated during drag)
+            saveMovedEvent(draggingEventId, movedEvent.startDate, movedEvent.endDate);
+          }
+        }
+      }
+      
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
+        resizeTimeoutRef.current = null;
+        
+        // If there was a pending resize operation, save it immediately
+        if (draggingEventId) {
+          const resizedEvent = events.find(event => event.id === draggingEventId);
+          if (resizedEvent) {
+            saveResizedEvent(draggingEventId, resizedEvent.endDate);
+          }
+        }
+      }
+      
       setDraggingEventId(null);
     };
 
     document.addEventListener("mouseup", handleMouseUp);
+    
+    // Cleanup function
     return () => {
       document.removeEventListener("mouseup", handleMouseUp);
+      
+      // Clear timeouts on unmount
+      if (moveTimeoutRef.current) {
+        clearTimeout(moveTimeoutRef.current);
+      }
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
+      }
     };
-  }, []);
+  }, [draggingEventId, events]); // Added dependencies to track current dragging state
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex flex-1 overflow-auto select-none">
-        <div className="w-12 flex-shrink-0 pt-1 pb-1">
-          {hours.map((hour) => (
-            <TimeSlot key={hour} hour={hour} />
-          ))}
+      <TooltipProvider>
+        <div className="flex flex-1 overflow-auto select-none">
+          <div className="w-10 sm:w-12 flex-shrink-0 pt-1 pb-1">
+            {hours.map((hour) => (
+              <TimeSlot key={hour} hour={hour} />
+            ))}
+          </div>
+
+          <div className="flex-1 border-l relative pt-1 pb-1">
+            {/* Current time indicator */}
+            {isSameDay(selectedDate, currentTime) && (
+              <div 
+                className="absolute left-0 right-0 h-0.5 bg-red-500 z-20 pointer-events-none"
+                style={{ 
+                  top: `${(currentTime.getHours() * 60 + currentTime.getMinutes() + currentTime.getSeconds() / 60) * 0.8}px` 
+                }}
+              >
+                <div className="absolute -top-1.5 -left-3 w-3 h-3 bg-red-500 rounded-full"></div>
+                <div className="absolute -top-6 right-2 text-red-500 text-xs px-2 py-1 rounded font-mono">
+                  {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </div>
+            )}
+            
+            {hours.map((hour) => (
+              <div
+                key={hour}
+                className="relative border-b"
+                style={{ height: "48px", minHeight: "48px" }}
+                onDoubleClick={(e) => {
+                  if (e.target === e.currentTarget) {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const y = e.clientY - rect.top;
+                    const minutes = Math.round((y / 48) * 60);
+
+                    const startMinutes = Math.floor(minutes / 15) * 15;
+                    const endMinutes = startMinutes + 60;
+
+                    const newTempEvent: CalendarEvent = {
+                      id: Math.random().toString(36).substr(2, 9),
+                      title: "",
+                      startDate: new Date(
+                        selectedDate.getFullYear(),
+                        selectedDate.getMonth(),
+                        selectedDate.getDate(),
+                        hour,
+                        startMinutes
+                      ).toISOString(),
+                      endDate: new Date(
+                        selectedDate.getFullYear(),
+                        selectedDate.getMonth(),
+                        selectedDate.getDate(),
+                        hour + Math.floor(endMinutes / 60),
+                        endMinutes % 60
+                      ).toISOString(),
+                      color: "blue",
+                    };
+
+                    console.log("Double-click created temp event:", newTempEvent);
+                    setTempEvent(newTempEvent);
+                    setCreatingEvent(true);
+                  }
+                }}
+              >
+                {dayEvents
+                  .filter(
+                    (event) => parseISO(event.startDate).getHours() === hour
+                  )
+                  .map((event) => (
+                    <EventBlock
+                      key={event.id}
+                      event={event}
+                      onMove={handleMoveEvent}
+                      onResize={handleResizeEvent}
+                      onEdit={editEvent}
+                      onDelete={deleteEvent}
+                      position={
+                        eventPositions[event.id] || { left: 0, width: 100 }
+                      }
+                      isDraggingId={draggingEventId}
+                      isSavingId={savingEventId}
+                    />
+                  ))}
+              </div>
+            ))}
+          </div>
         </div>
-
-        <div className="flex-1 border-l relative pt-1 pb-1">
-          {hours.map((hour) => (
-            <div
-              key={hour}
-              className="relative border-b"
-              style={{ height: "48px", minHeight: "48px" }}
-              onDoubleClick={(e) => {
-                if (e.target === e.currentTarget) {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const y = e.clientY - rect.top;
-                  const minutes = Math.round((y / 48) * 60);
-
-                  const startMinutes = Math.floor(minutes / 15) * 15;
-                  const endMinutes = startMinutes + 60;
-
-                  const newTempEvent: CalendarEvent = {
-                    id: "temp",
-                    title: "",
-                    startDate: new Date(
-                      selectedDate.getFullYear(),
-                      selectedDate.getMonth(),
-                      selectedDate.getDate(),
-                      hour,
-                      startMinutes
-                    ).toISOString(),
-                    endDate: new Date(
-                      selectedDate.getFullYear(),
-                      selectedDate.getMonth(),
-                      selectedDate.getDate(),
-                      hour + Math.floor(endMinutes / 60),
-                      endMinutes % 60
-                    ).toISOString(),
-                    color: "blue",
-                  };
-
-                  setTempEvent(newTempEvent);
-                  setCreatingEvent(true);
-                }
-              }}
-            >
-              {dayEvents
-                .filter(
-                  (event) => parseISO(event.startDate).getHours() === hour
-                )
-                .map((event) => (
-                  <EventBlock
-                    key={event.id}
-                    event={event}
-                    onMove={handleMoveEvent}
-                    onResize={handleResizeEvent}
-                    onEdit={editEvent}
-                    onDelete={deleteEvent}
-                    position={
-                      eventPositions[event.id] || { left: 0, width: 100 }
-                    }
-                    isDraggingId={draggingEventId}
-                  />
-                ))}
-            </div>
-          ))}
-        </div>
-      </div>
+      </TooltipProvider>
 
       {editingEvent && !creatingEvent && (
         <EventEditor
@@ -1040,12 +1789,16 @@ const CalendarDayView: React.FC<{
           onCancel={closeEditor}
           open={!!editingEvent}
           onOpenChange={(open) => !open && closeEditor()}
+          token={token || undefined}
         />
       )}
 
       {creatingEvent && (
         <Dialog open={creatingEvent} onOpenChange={setCreatingEvent}>
-          <DialogContent>
+          <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Create New Event</DialogTitle>
+            </DialogHeader>
             <EventCreator
               selectedDate={selectedDate}
               onSave={handleCreateEvent}
@@ -1063,13 +1816,141 @@ const CalendarDayView: React.FC<{
 };
 
 const Calendar: React.FC = () => {
+  const { token, isAuthenticated } = useAuth();
   const [selectedDate, setSelectedDate] = React.useState(new Date());
   const [creatingEvent, setCreatingEvent] = React.useState(false);
-  const [events, setEvents] = React.useState<CalendarEvent[]>(mockEvents);
+  const [events, setEvents] = React.useState<CalendarEvent[]>(initialEvents);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [soundEnabled, setSoundEnabled] = React.useState(false);
+  const [showSummary, setShowSummary] = React.useState(false);
+  const [showChecklist, setShowChecklist] = React.useState(false);
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
 
-  const handleCreateEvent = (newEvent: CalendarEvent) => {
-    setEvents((prevEvents) => [...prevEvents, newEvent]);
+  // Initialize audio element
+  React.useEffect(() => {
+    audioRef.current = new Audio("/alert.mp3");
+    audioRef.current.preload = "auto";
+    
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  // Check for events starting at current time
+  React.useEffect(() => {
+    if (!soundEnabled) return;
+
+    const checkForEvents = () => {
+      const now = new Date();
+      const currentTime = format(now, "HH:mm");
+      
+      const currentEvents = events.filter(event => {
+        const eventStartDate = parseISO(event.startDate);
+        const eventTime = format(eventStartDate, "HH:mm");
+        return eventTime === currentTime && isSameDay(eventStartDate, now);
+      });
+
+      if (currentEvents.length > 0 && audioRef.current) {
+        audioRef.current.play().catch(error => {
+          console.error("Error playing alert sound:", error);
+        });
+      }
+    };
+
+    // Check every minute
+    const interval = setInterval(checkForEvents, 60000);
+    // Also check immediately when sound is enabled
+    checkForEvents();
+
+    return () => clearInterval(interval);
+  }, [events, soundEnabled]);
+
+  // Function to save all events and refresh data from the database
+  const saveAllAndRefresh = async () => {
+    try {
+      setIsLoading(true);
+      // Fetch all events from the database
+      const fetchedEvents = await fetchAllEvents(token || undefined);
+      
+      // Update the events state regardless of whether there are events or not
+      setEvents(fetchedEvents);
+      console.log("All events refreshed from database successfully", fetchedEvents);
+      
+      // Show a notification to the user
+      alert("Calendar data refreshed successfully!");
+    } catch (error) {
+      console.error("Error refreshing events:", error);
+      alert("Error refreshing calendar data. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Fetch tasks from API on component mount
+  React.useEffect(() => {
+    const loadTasks = async () => {
+      setIsLoading(true);
+      try {
+        const tasksData = await fetchTasks(token || undefined);
+        setEvents(tasksData);
+      } catch (error) {
+        console.error("Failed to load tasks:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    if (isAuthenticated) {
+      loadTasks();
+    }
+  }, [token, isAuthenticated]);
+
+  const handleCreateEvent = async (newEvent: CalendarEvent) => {
+    console.log("Creating new event:", newEvent);
+    try {
+      // Add the temporary event to the UI immediately
+      setEvents((prev) => [...prev, newEvent]);
+      
+      // Remove id to let the backend generate one
+      const { id, ...eventData } = newEvent;
+      console.log("Event data being sent to API:", eventData);
+      
+      // Create the task in the database
+      const createdTask = await createTask(eventData, token || undefined);
+      
+      if (createdTask) {
+        // Update the UI with the newly created task (with the backend-generated ID)
+        setEvents((prev) => 
+          prev.map(event => 
+            event.id === newEvent.id ? createdTask : event
+          )
+        );
+        console.log("Event created successfully:", createdTask);
+      } else {
+        console.error("Failed to create event: No response from server");
+        // If creation failed, remove the temporary event from the UI
+        setEvents((prev) => prev.filter(event => event.id !== newEvent.id));
+      }
+    } catch (error) {
+      console.error("Error creating event:", error);
+      // If creation failed, remove the temporary event from the UI
+      setEvents((prev) => prev.filter(event => event.id !== newEvent.id));
+    }
     setCreatingEvent(false);
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      const success = await deleteTask(taskId, token);
+      if (success) {
+        setEvents((prevEvents) => prevEvents.filter((event) => event.id !== taskId));
+      }
+    } catch (error) {
+      console.error("Error deleting task:", error);
+    }
   };
 
   const handleExport = () => {
@@ -1078,10 +1959,10 @@ const Calendar: React.FC = () => {
       dataStr
     )}`;
 
-    const exportFileDefaultName = `events-${format(
+    const exportFileDefaultName = `tasks-${format(
       selectedDate,
       "yyyy-MM-dd"
-    )}.json`;
+    )}.txt`;
 
     const linkElement = document.createElement("a");
     linkElement.setAttribute("href", dataUri);
@@ -1118,42 +1999,87 @@ const Calendar: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto py-4 px-2 sm:py-6 sm:px-4 md:px-6 max-w-7xl bg-background flex flex-col">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <div className="border rounded-md px-4 py-2 text-base font-medium bg-background">
+    <div className="container mx-auto py-2 px-2 sm:py-4 sm:px-4 md:px-6 max-w-7xl bg-background flex flex-col">
+      <div className="flex flex-col sm:flex-row items-center justify-between mb-3 sm:mb-4 gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 w-full sm:w-auto">
+          <div className="border rounded-md px-3 py-2 text-sm sm:text-base font-medium bg-background min-w-[120px] sm:min-w-[140px] text-center">
             {format(selectedDate, "yyyy/MM/dd")}
           </div>
 
-          <Button
-            onClick={() => setSelectedDate(addDays(selectedDate, -1))}
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
+          <div className="flex gap-1">
+            <Button
+              onClick={() => setSelectedDate(addDays(selectedDate, -1))}
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
 
-          <Button
-            onClick={() => setSelectedDate(new Date())}
-            variant="outline"
-            size="sm"
-            className="h-8 px-2 text-sm"
-          >
-            Today
-          </Button>
+            <Button
+              onClick={() => setSelectedDate(new Date())}
+              variant="outline"
+              size="sm"
+              className="h-8 px-2 text-xs sm:text-sm"
+            >
+              Today
+            </Button>
 
-          <Button
-            onClick={() => setSelectedDate(addDays(selectedDate, 1))}
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </Button>
+            <Button
+              onClick={() => setSelectedDate(addDays(selectedDate, 1))}
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 w-full sm:w-auto justify-end">
+          <div className="flex items-center gap-2 mr-2">
+            <Checkbox
+              id="checklist-toggle"
+              checked={showChecklist}
+              onCheckedChange={(checked) => setShowChecklist(checked as boolean)}
+            />
+            <label 
+              htmlFor="checklist-toggle" 
+              className="text-sm font-medium leading-none cursor-pointer"
+            >
+              Checklist
+            </label>
+          </div>
+          
+          <Button
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+          >
+            {soundEnabled ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+          </Button>
+          
+          <Button
+            onClick={() => setShowSummary(true)}
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs sm:text-sm px-2 sm:px-3"
+          >
+            <span className="hidden xs:inline">Summary</span>
+            <span className="xs:hidden">Sum</span>
+          </Button>
+          
+          <Button
+            onClick={saveAllAndRefresh}
+            variant="default"
+            size="sm"
+            className="h-8 text-xs sm:text-sm px-2 sm:px-4"
+          >
+            <span className="hidden xs:inline">Save & Refresh</span>
+            <span className="xs:hidden">Refresh</span>
+          </Button>
+          
           <Button
             onClick={handleImport}
             variant="outline"
@@ -1178,7 +2104,10 @@ const Calendar: React.FC = () => {
                 <Plus className="w-4 h-4" />
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Create New Event</DialogTitle>
+              </DialogHeader>
               <EventCreator
                 selectedDate={selectedDate}
                 onSave={handleCreateEvent}
@@ -1189,17 +2118,104 @@ const Calendar: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1">
-        <div className="border rounded-lg p-2 sm:p-4 h-auto min-h-[300px] mb-20">
-          <CalendarDayView
-            selectedDate={selectedDate}
-            events={events}
-            setEvents={setEvents}
-          />
+      <div className="flex flex-1 gap-4 flex-col lg:flex-row">
+        <div className="flex-1">
+          <div className="border rounded-lg p-1 sm:p-2 md:p-4 h-auto min-h-[300px] mb-16 sm:mb-20">
+            <CalendarDayView
+              selectedDate={selectedDate}
+              events={events}
+              setEvents={setEvents}
+              token={token || undefined}
+            />
+          </div>
         </div>
+        
+        {showChecklist && (
+          <div className="w-full lg:w-80">
+            <div className="border rounded-lg p-4">
+              <h2 className="text-lg font-semibold mb-4">Checklist</h2>
+              <ChecklistComponent events={events} setEvents={setEvents} token={token} />
+            </div>
+          </div>
+        )}
       </div>
+
+      <Dialog open={showSummary} onOpenChange={setShowSummary}>
+        <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Task Summary</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {events.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">
+                No tasks found
+              </p>
+            ) : (
+              [...events]
+                .sort((a, b) => 
+                  parseISO(a.startDate).getTime() - parseISO(b.startDate).getTime()
+                )
+                .map((event) => (
+                  <div 
+                    key={event.id} 
+                    className="border rounded-md p-3 hover:bg-accent transition-colors relative group"
+                  >
+                    <div className="flex justify-between items-start">
+                      <h3 className="font-medium">{event.title}</h3>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
+                        {format(parseISO(event.startDate), "MMM d, yyyy")}
+                      </span>
+                    </div>
+                    {event.description && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {event.description}
+                      </p>
+                    )}
+                    <div className="flex justify-between items-center mt-2">
+                      <span className="text-xs text-muted-foreground">
+                        {format(parseISO(event.startDate), "HH:mm")} -{" "}
+                        {format(parseISO(event.endDate), "HH:mm")}
+                      </span>
+                      <span className={`inline-block w-3 h-3 rounded-full bg-${event.color}-500`}></span>
+                    </div>
+                    
+                    {/* Delete button for desktop - shown on hover at bottom right */}
+                    <button
+                      onClick={() => handleDeleteTask(event.id)}
+                      className="absolute right-2 bottom-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                      aria-label="Delete task"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                    
+                    {/* Delete button for mobile - shown with swipe at bottom right */}
+                    <div className="absolute right-0 bottom-0 top-auto w-16 bg-red-500 rounded-br-md rounded-tr-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 md:hidden">
+                      <button
+                        onClick={() => handleDeleteTask(event.id)}
+                        className="text-white p-2"
+                        aria-label="Delete task"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))
+            )}
+            <div className="pt-2 border-t">
+              <p className="text-sm font-medium">
+                Total tasks: {events.length}
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
 
 export default Calendar;
+

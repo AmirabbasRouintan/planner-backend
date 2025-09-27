@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
-from .models import Ticket, ConfigFile, V2RayConfig, UserProfile
+from .models import Ticket, ConfigFile, V2RayConfig, UserProfile, Task, PermanentNote
 
 @admin.register(Ticket)
 class TicketAdmin(admin.ModelAdmin):
@@ -41,13 +41,26 @@ class UserProfileInline(admin.StackedInline):
 # Create a custom UserAdmin
 class CustomUserAdmin(UserAdmin):
     inlines = (UserProfileInline,)
-    list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff', 'get_v2ray_access_status', 'get_v2ray_admin_status')
+    list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff', 'get_v2ray_admin_status')
     
     def get_v2ray_admin_status(self, obj):
         return obj.profile.is_v2ray_admin if hasattr(obj, 'profile') else False
     get_v2ray_admin_status.short_description = 'V2Ray Admin'
     get_v2ray_admin_status.boolean = True
     
+@admin.register(Task)
+class TaskAdmin(admin.ModelAdmin):
+    list_display = ('title', 'user', 'start_date', 'end_date', 'color')
+    list_filter = ('color', 'start_date', 'created_at')
+    search_fields = ('title', 'user__username')
+    readonly_fields = ('created_at', 'updated_at')
+
+@admin.register(PermanentNote)
+class PermanentNoteAdmin(admin.ModelAdmin):
+    list_display = ('title', 'user', 'created_at')
+    list_filter = ('created_at',)
+    search_fields = ('title', 'content', 'user__username')
+    readonly_fields = ('created_at', 'updated_at')
     def get_v2ray_access_status(self, obj):
         return obj.profile.has_v2ray_access if hasattr(obj, 'profile') else False
     get_v2ray_access_status.short_description = 'V2Ray Access'

@@ -4,6 +4,22 @@ import { XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
+// VisuallyHidden component for accessibility
+const VisuallyHidden = React.forwardRef<
+  HTMLSpanElement,
+  React.HTMLAttributes<HTMLSpanElement>
+>(({ children, ...props }, ref) => {
+  return (
+    <span
+      ref={ref}
+      className="absolute w-px h-px p-0 -m-px overflow-hidden whitespace-nowrap border-0"
+      {...props}
+    >
+      {children}
+    </span>
+  )
+})
+
 function Dialog({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
@@ -48,9 +64,11 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  title = "Dialog",
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
-  showCloseButton?: boolean
+  showCloseButton?: boolean,
+  title?: string
 }) {
   return (
     <DialogPortal data-slot="dialog-portal">
@@ -63,6 +81,10 @@ function DialogContent({
         )}
         {...props}
       >
+        {/* Add VisuallyHidden DialogTitle for accessibility */}
+        <VisuallyHidden>
+          <DialogTitle>{title}</DialogTitle>
+        </VisuallyHidden>
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close
