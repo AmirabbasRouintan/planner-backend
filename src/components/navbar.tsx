@@ -2,20 +2,29 @@ import { Link, useLocation } from "react-router-dom";
 import { Home, Calendar, User, Wifi } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import type { ComponentType } from "react";
+
+// Define a consistent type for nav items
+type NavItem = {
+  path: string;
+  icon: ComponentType<any>;
+  label?: string;
+  isV2Ray?: boolean;
+};
 
 export default function Navbar() {
   const location = useLocation();
   const { user, isAuthenticated, isAdmin, hasV2RayAccess, isV2RayAdmin } = useAuth();
 
-  const baseNavItems = [
+  const baseNavItems: NavItem[] = [
     { path: "/home", icon: Home },
     { path: "/planner", icon: Calendar },
     { path: "/calendar", icon: Calendar },
     { path: "/auth", icon: User, label: isAuthenticated ? (user?.username?.substring(0, 3) || user?.name?.substring(0, 3) || "...") : undefined }
   ];
   
-  const navItems = (isAdmin || isV2RayAdmin || hasV2RayAccess) 
-    ? [...baseNavItems, { path: "/v2ray", icon: Wifi, label: "V2Ray", isV2Ray: true }] 
+  const navItems: NavItem[] = (isAdmin || isV2RayAdmin || hasV2RayAccess)
+    ? [...baseNavItems, { path: "/v2ray", icon: Wifi, label: "V2Ray", isV2Ray: true }]
     : baseNavItems;
 
   return (

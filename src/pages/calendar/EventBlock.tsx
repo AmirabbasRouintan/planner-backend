@@ -16,8 +16,7 @@ interface Props {
   onDelete: (id: string) => void;
   position: { left: number; width: number };
   isDraggingId: string | null;
-  isSavingId: string | null;
-}
+  }
 
 const EventBlock: React.FC<Props> = React.memo(
   ({
@@ -28,8 +27,7 @@ const EventBlock: React.FC<Props> = React.memo(
     onDelete,
     position,
     isDraggingId,
-    isSavingId
-  }) => {
+    }) => {
     const start = React.useMemo(
       () => parseISO(event.startDate),
       [event.startDate]
@@ -376,7 +374,7 @@ const EventBlock: React.FC<Props> = React.memo(
       }
     };
 
-    const handleTouchEnd = (e: React.TouchEvent) => {
+    const handleTouchEnd = () => {
       if (longPressTimerRef.current !== null) {
         clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;

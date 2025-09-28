@@ -204,8 +204,8 @@ const CalendarDayView: React.FC<Props> = ({
   const [draggingEventId, setDraggingEventId] = React.useState<string | null>(
     null
   );
-  const [savingEventId, setSavingEventId] = React.useState<string | null>(null);
-
+  // NOTE: savingEventId has been removed
+  
   const handleMoveEvent = (
     id: string,
     newStartDate: string,
@@ -237,8 +237,6 @@ const CalendarDayView: React.FC<Props> = ({
           return currentEvents;
         }
 
-        setSavingEventId(id);
-
         const updatedEvent = {
           ...eventToUpdate,
           startDate: newStartDate,
@@ -261,7 +259,6 @@ const CalendarDayView: React.FC<Props> = ({
           })
           .finally(() => {
             setDraggingEventId(null);
-            setSavingEventId(null);
           });
 
         return currentEvents.map((event) =>
@@ -295,8 +292,6 @@ const CalendarDayView: React.FC<Props> = ({
           return currentEvents;
         }
 
-        setSavingEventId(id);
-
         const updatedEvent = {
           ...eventToUpdate,
           endDate: newEndDate
@@ -318,7 +313,6 @@ const CalendarDayView: React.FC<Props> = ({
           })
           .finally(() => {
             setDraggingEventId(null);
-            setSavingEventId(null);
           });
 
         return currentEvents.map((event) =>
@@ -505,8 +499,7 @@ const CalendarDayView: React.FC<Props> = ({
                         eventPositions[event.id] || { left: 0, width: 100 }
                       }
                       isDraggingId={draggingEventId}
-                      isSavingId={savingEventId}
-                    />
+                      />
                   ))}
               </div>
             ))}
@@ -521,7 +514,6 @@ const CalendarDayView: React.FC<Props> = ({
           onCancel={closeEditor}
           open={!!editingEvent}
           onOpenChange={(open) => !open && closeEditor()}
-          token={token || undefined}
         />
       )}
 

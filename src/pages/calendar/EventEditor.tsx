@@ -12,10 +12,9 @@ interface Props {
   onCancel: () => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  token?: string;
-}
+  }
 
-const EventEditor: React.FC<Props> = ({ event, onSave, onCancel, open, onOpenChange, token }) => {
+const EventEditor: React.FC<Props> = ({ event, onSave, onCancel, open, onOpenChange }) => {
   const [title, setTitle] = React.useState(event?.title || "");
   const [description, setDescription] = React.useState(event?.description || "");
   const [startTime, setStartTime] = React.useState(

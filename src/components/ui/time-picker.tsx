@@ -38,8 +38,6 @@ function formatTime(hours: number, minutes: number) {
 
 const CLOCK_SIZE = 280;
 const CLOCK_RADIUS = CLOCK_SIZE / 2;
-const HOUR_HAND_LENGTH = 80;
-const MINUTE_HAND_LENGTH = 100;
 
 function getClockPosition(value: number, max: number, radius: number) {
   const angle = (value * 360) / max - 90; // -90 to start at 12 o'clock
