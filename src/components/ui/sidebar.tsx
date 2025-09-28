@@ -35,9 +35,9 @@ const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 type SidebarContextProps = {
   state: "expanded" | "collapsed"
   open: boolean
-  setOpen: (open: boolean) => void
+  setOpen: (open: boolean | ((prev: boolean) => boolean)) => void
   openMobile: boolean
-  setOpenMobile: (open: boolean) => void
+  setOpenMobile: (open: boolean | ((prev: boolean) => boolean)) => void
   isMobile: boolean
   toggleSidebar: () => void
 }
@@ -70,26 +70,31 @@ function SidebarProvider({
   const [openMobile, setOpenMobile] = React.useState(false)
 
   const [_open, _setOpen] = React.useState(defaultOpen)
-  const [_open, _setOpen] = React.useState(defaultOpen)
   const open = openProp ?? _open
   const setOpen = React.useCallback(
-    (value: boolean | ((value: boolean) => boolean)) => {
-      const openState = typeof value === "function" ? value(open) : value
+    (value: boolean | ((prev: boolean) => boolean)) => {
+      const openState =
+        typeof value === "function" ? (value as (prev: boolean) => boolean)(open) : value
       if (setOpenProp) {
         setOpenProp(openState)
       } else {
         _setOpen(openState)
       }
 
-      document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+      // Persist sidebar state in a cookie
       document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
     },
     [setOpenProp, open]
   )
 
- q
+  const toggleSidebar = React.useCallback(() => {
+    if (isMobile) {
+      setOpenMobile((prev) => !prev)
+    } else {
+      setOpen((prev) => !prev)
+    }
+  }, [isMobile, setOpen, setOpenMobile])
 
-  React.useEffect(() => {
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
@@ -105,7 +110,6 @@ function SidebarProvider({
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [toggleSidebar])
 
-  const state = open ? "expanded" : "collapsed"
   const state = open ? "expanded" : "collapsed"
 
   const contextValue = React.useMemo<SidebarContextProps>(
@@ -209,7 +213,6 @@ function Sidebar({
       data-side={side}
       data-slot="sidebar"
     >
-      <div
       <div
         data-slot="sidebar-gap"
         className={cn(
