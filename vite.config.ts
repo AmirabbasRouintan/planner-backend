@@ -18,6 +18,7 @@ export default defineConfig(async () => {
       },
     },
     server: {
+      host: '0.0.0.0',
       proxy: {
         '/api': {
           target: backendUrl,

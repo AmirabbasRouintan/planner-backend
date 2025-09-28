@@ -30,7 +30,7 @@ const getBackendUrl = () => {
   }
   
   // Default fallback
-  const defaultUrl = 'http://localhost:8000';
+  const defaultUrl = 'http://192.168.100.65:8000';
   console.log(`Using default backend URL: ${defaultUrl}`);
   return defaultUrl;
 };

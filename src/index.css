@@ -14,7 +14,6 @@
 
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #000000;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -55,6 +54,15 @@
   --sidebar-border: oklch(0.92 0.00 286.61);
   --sidebar-ring: oklch(0.71 0.01 286.09);
   --calendar-date-bg: #161616; /* Added color variable */
+  
+  /* Calendar-specific colors */
+  --calendar-time-morning: oklch(0.98 0.01 85);
+  --calendar-time-afternoon: oklch(0.97 0.01 65);
+  --calendar-time-evening: oklch(0.96 0.01 45);
+  --calendar-current-time: oklch(0.65 0.22 25);
+  --calendar-grid-line: oklch(0.94 0.00 286.61);
+  --calendar-business-hours: oklch(0.99 0.00 0);
+  --calendar-off-hours: oklch(0.97 0.00 0);
 
   --font-sans: Nunito, sans-serif;
   --font-serif: Source Serif 4, serif;
@@ -121,6 +129,15 @@
   --sidebar-ring: oklch(0.55 0.02 285.93);
   --calendar-date-bg: #161616; /* Added color variable for dark theme */
   
+  /* Calendar-specific colors for dark theme */
+  --calendar-time-morning: oklch(0.18 0.01 285);
+  --calendar-time-afternoon: oklch(0.16 0.01 285);
+  --calendar-time-evening: oklch(0.14 0.01 285);
+  --calendar-current-time: oklch(0.65 0.22 25);
+  --calendar-grid-line: oklch(1.00 0 0 / 8%);
+  --calendar-business-hours: oklch(0.16 0.01 285);
+  --calendar-off-hours: oklch(0.14 0.01 285);
+  
   --shadow-2xs: 0 1px 13px 0px oklch(0 0 0 / 0.13);
   --shadow-xs: 0 1px 13px 0px oklch(0 0 0 / 0.13);
   --shadow-sm: 0 1px 13px 0px oklch(0 0 0 / 0.25), 0 1px 2px -1px oklch(0 0 0 / 0.25);
@@ -164,6 +181,15 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  
+  /* Calendar theme colors */
+  --color-calendar-time-morning: var(--calendar-time-morning);
+  --color-calendar-time-afternoon: var(--calendar-time-afternoon);
+  --color-calendar-time-evening: var(--calendar-time-evening);
+  --color-calendar-current-time: var(--calendar-current-time);
+  --color-calendar-grid-line: var(--calendar-grid-line);
+  --color-calendar-business-hours: var(--calendar-business-hours);
+  --color-calendar-off-hours: var(--calendar-off-hours);
 
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
@@ -184,6 +210,60 @@
   --shadow-2xl: var(--shadow-2xl);
 }
 
+/* Custom utilities for calendar */
+@utility calendar-time-slot {
+  position: relative;
+  border-bottom: 1px solid var(--color-calendar-grid-line);
+  transition: background-color 0.2s ease;
+}
+
+@utility calendar-time-slot-morning {
+  background-color: var(--color-calendar-time-morning);
+}
+
+@utility calendar-time-slot-afternoon {
+  background-color: var(--color-calendar-time-afternoon);
+}
+
+@utility calendar-time-slot-evening {
+  background-color: var(--color-calendar-time-evening);
+}
+
+@utility calendar-business-hours {
+  background-color: var(--color-calendar-business-hours);
+}
+
+@utility calendar-off-hours {
+  background-color: var(--color-calendar-off-hours);
+}
+
+@utility event-glassmorphism {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+@utility event-hover-scale {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  
+  &:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+}
+
+/* Enhanced event block utilities */
+@utility event-focus-ring {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@utility event-touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
 /* Base styles */
 @layer base {
   @keyframes v2ray-pulse {
@@ -194,6 +274,27 @@
       box-shadow: 0 0 0 5px rgba(34, 197, 94, 0);
     }
   }
+  
+  @keyframes calendar-pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
+    }
+  }
+  
+  @keyframes slide-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
   * {
     @apply border-border outline-ring/50;
   }

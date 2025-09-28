@@ -22,8 +22,10 @@ import concurrent.futures
 from queue import Queue
 
 def get_backend_url():
-    """Get backend URL from environment variable or use default"""
-    return os.environ.get('BACKEND_URL', 'http://localhost:8000')
+    """
+    Get the backend URL from environment variable or return default.
+    """
+    return os.environ.get('BACKEND_URL', 'http://192.168.100.65:8000')
 
 class OptimizedV2RayTester:
     def __init__(self, root_tk=None):
