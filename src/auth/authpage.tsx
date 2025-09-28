@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { User, Edit3, Check, X } from "lucide-react";
+import { Edit3, Check, X } from "lucide-react";
 
 interface FormData {
   name?: string;
@@ -60,11 +60,10 @@ export default function AuthPage() {
         throw new Error(data.message || "Failed to update name");
       }
 
-      const updatedUser = { ...user, name: newName };
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-      document.cookie = `user=${JSON.stringify(updatedUser)}; path=/; max-age=604800`;
-      
       if (user) {
+        const updatedUser = { ...user, name: newName };
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+        document.cookie = `user=${JSON.stringify(updatedUser)}; path=/; max-age=604800`;
         login({ ...updatedUser, id: user.id, email: user.email || "" }, token || "");
       }
       
