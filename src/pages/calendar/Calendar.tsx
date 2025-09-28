@@ -300,7 +300,7 @@ const Calendar: React.FC = () => {
     <div className="min-h-screen">
       <div className="container mx-auto py-3 px-3 sm:px-4 md:px-6">
         {/* Header Section */}
-        <Card className="mb-4 shadow-lg border border-border bg-card/90 backdrop-blur supports-[backdrop-filter]:bg-card/70">
+        <Card className="mb-4 shadow-lg border border-border bg-[var(--calendar-date-bg)] backdrop-blur supports-[backdrop-filter]">
           <CardHeader className="py-4 px-6">
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
               {/* Date Navigation */}
@@ -617,7 +617,7 @@ const Calendar: React.FC = () => {
         <div className="flex flex-1 gap-4 md:gap-6 flex-col xl:flex-row">
           {/* Calendar View */}
           <div className="flex-1">
-            <Card className="shadow-lg border border-border bg-card/90 backdrop-blur supports-[backdrop-filter]:bg-card/70 overflow-hidden">
+            <Card className="shadow-lg border border-border bg-[var(--calendar-date-bg)] backdrop-blur overflow-hidden">
               <CardContent className="py-2 pl-2 pr-0">
                 <CalendarDayView
                   selectedDate={selectedDate}
