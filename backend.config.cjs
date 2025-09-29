@@ -30,7 +30,7 @@ const getBackendUrl = () => {
   }
   
   // Default fallback
-  const defaultUrl = 'http://192.168.100.65:8000';
+  const defaultUrl = 'http://ixiflower32.pythonanywhere.com';
   console.log(`Using default backend URL: ${defaultUrl}`);
   return defaultUrl;
 };
