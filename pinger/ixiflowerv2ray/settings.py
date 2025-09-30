@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-uer+0@+y3abl7%lot3lqmr$=5e13saz1xtok0ghlt@(tp-it&=
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['185.92.181.112', '127.0.0.1', 'localhost', '*', ".vercel.app"]
+ALLOWED_HOSTS = ['185.92.181.112', '127.0.0.1', 'localhost', '*', ".vercel.app","ixiflower32.pythonanywhere.com", "https://planner-peach-ten.vercel.app"]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -128,6 +128,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
+    "http://87.120.219.252:3000",
     "http://192.168.100.65:5173",  # Vite's default development server
     "http://127.0.0.1:5173",
     "http://192.168.100.65:3000",   # React default port
