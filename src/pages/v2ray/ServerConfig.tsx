@@ -69,26 +69,26 @@ export default function ServerConfig({
   isUpdatingProxy
 }: ServerConfigProps) {
   return (
-    <Card className="mb-4 md:mb-6 bg-[var(--calendar-date-bg)]">
-      <CardHeader className="px-4 py-3 md:px-6 md:py-4">
-        <CardTitle className="flex items-center text-base md:text-lg">
-          <Server className="w-4 h-4 md:w-5 md:h-5 mr-2" />
+    <Card className="mb-6 bg-[var(--calendar-date-bg)] shadow-md rounded-lg overflow-hidden">
+      <CardHeader className="px-6 py-4 bg-muted/50">
+        <CardTitle className="flex items-center text-lg">
+          <Server className="w-5 h-5 mr-2" />
           Server Configuration
         </CardTitle>
-        <CardDescription className="text-xs md:text-sm">Enter the Django server URL to connect to V2Ray management</CardDescription>
+        <CardDescription>Enter the Django server URL to connect to V2Ray management</CardDescription>
       </CardHeader>
-      <CardContent className="px-4 md:px-6">
-        <div className="space-y-3 md:space-y-4">
-          <div className="flex flex-col sm:flex-row gap-2">
+      <CardContent className="px-6 py-5">
+        <div className="space-y-5">
+          <div className="flex flex-col sm:flex-row gap-3">
             <Input
               type="text"
               value={serverUrl}
               onChange={(e) => setServerUrl(e.target.value)}
               placeholder={`Enter server URL (e.g., ${BACKEND_URL})`}
-              className="flex-1 h-8 md:h-10 text-xs md:text-sm"
+              className="flex-1 h-10 text-sm"
             />
             <Button 
-              className="h-8 md:h-10 text-xs md:text-sm px-3 md:px-4"
+              className="h-10 text-sm px-4"
               onClick={async () => {
                 if (!serverUrl) {
                   setConfigError("Please enter a server URL");
@@ -178,36 +178,36 @@ export default function ServerConfig({
             </Button>
           </div>
           
-          <div className="flex flex-wrap items-center gap-2 p-2 md:p-3 bg-muted rounded-lg">
+          <div className="flex flex-wrap items-center gap-3 p-4 bg-muted rounded-lg">
             <div className="flex flex-col items-start">
-              <span className="text-xs md:text-sm font-medium mb-1">Connection Mode:</span>
+              <span className="text-sm font-medium mb-2">Connection Mode:</span>
               <div className="flex items-center">
-                <span className={`text-xs md:text-sm ${useProxy ? 'text-muted-foreground' : 'font-medium'}`}>Direct</span>
+                <span className={`text-sm ${useProxy ? 'text-muted-foreground' : 'font-medium'}`}>Direct</span>
                 <button 
                   onClick={() => setUseProxy(!useProxy)}
-                  className={`mx-1 md:mx-2 relative inline-flex h-5 md:h-6 w-9 md:w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+                  className={`mx-2 relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
                     useProxy ? 'bg-indigo-600' : 'bg-gray-200'
                   }`}
                 >
                   <span
                     className={`${
-                      useProxy ? 'translate-x-5 md:translate-x-6' : 'translate-x-1'
-                    } inline-block h-3 md:h-4 w-3 md:w-4 transform rounded-full bg-white transition-transform`}
+                      useProxy ? 'translate-x-6' : 'translate-x-1'
+                    } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
                   />
                 </button>
-                <span className={`text-xs md:text-sm ${useProxy ? 'font-medium' : 'text-muted-foreground'}`}>Proxy</span>
+                <span className={`text-sm ${useProxy ? 'font-medium' : 'text-muted-foreground'}`}>Proxy</span>
               </div>
             </div>
             <div className="flex flex-col items-start ml-auto">
-              <Shuffle className="w-3 h-3 md:w-4 md:h-4 self-end mb-1" />
+              <Shuffle className="w-4 h-4 self-end mb-1" />
               <span className="text-xs text-muted-foreground">
                 {useProxy ? 'Using Vite proxy' : 'Direct connection to server'}
               </span>
             </div>
             <Dialog>
               <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-4 w-4 rounded-full ml-2">
-                  <Info className="h-3 w-3" />
+                <Button variant="ghost" size="icon" className="h-5 w-5 rounded-full ml-2">
+                  <Info className="h-4 w-4" />
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-md">
@@ -280,14 +280,14 @@ export default function ServerConfig({
             </Dialog>
           </div>
           
-          <div className="text-xs md:text-sm text-muted-foreground space-y-1">
+          <div className="text-sm text-muted-foreground space-y-1">
             <p>• Enter your Django server URL with port (e.g., {BACKEND_URL})</p>
             <p>• Make sure the server is running and accessible</p>
             <p>• Connection will be tested automatically when you click Connect</p>
           </div>
           
-          <div className="flex items-center gap-2 text-xs md:text-sm">
-            <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+          <div className="flex items-center gap-2 text-sm">
+            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
             <span className={isConnected ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
               {isConnected ? 'Connected' : 'Not Connected'}
             </span>

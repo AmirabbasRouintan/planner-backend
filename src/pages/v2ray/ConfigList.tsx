@@ -28,17 +28,17 @@ export default function ConfigList({
   downloadConfig
 }: ConfigListProps) {
   return (
-    <Card className="mb-4 md:mb-6 bg-[var(--calendar-date-bg)]">
-      <CardHeader className="px-4 py-3 md:px-6 md:py-4">
-        <CardTitle className="flex items-center text-base md:text-lg">
-          <FileText className="w-4 h-4 md:w-5 md:h-5 mr-2" />
+    <Card className="mb-6 shadow-md rounded-lg overflow-hidden bg-[var(--calendar-date-bg)]">
+      <CardHeader className="px-6 py-4 bg-muted/50">
+        <CardTitle className="flex items-center text-lg">
+          <FileText className="w-5 h-5 mr-2" />
           V2Ray Configurations
         </CardTitle>
-        <CardDescription className="text-xs md:text-sm">Available V2Ray configuration files</CardDescription>
+        <CardDescription>Available V2Ray configuration files</CardDescription>
       </CardHeader>
-      <CardContent className="px-4 md:px-6">
+      <CardContent className="px-6 py-5">
         {loadingConfigs ? (
-          <div className="flex items-center justify-center py-8">
+          <div className="flex items-center justify-center py-10">
             <RefreshCw className="w-6 h-6 animate-spin mr-2" />
             <span>Loading configurations...</span>
           </div>
@@ -48,17 +48,17 @@ export default function ConfigList({
             <AlertDescription>{configError}</AlertDescription>
           </Alert>
         ) : configs.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
+          <div className="text-center py-10 text-muted-foreground">
             <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p>No configurations available</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {configs.map((config) => (
-              <div key={config.id || config.title} className="flex items-center justify-between p-3 border rounded-lg">
+              <div key={config.id || config.title} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                 <div className="flex-1">
-                  <h4 className="font-medium">{config.title}</h4>
-                  <p className="text-sm text-muted-foreground truncate max-w-md">
+                  <h4 className="font-medium text-base">{config.title}</h4>
+                  <p className="text-sm text-muted-foreground truncate max-w-md mt-1">
                     {config.text.substring(0, 100)}...
                   </p>
                 </div>
@@ -66,6 +66,7 @@ export default function ConfigList({
                   onClick={() => downloadConfig(config)}
                   variant="outline"
                   size="sm"
+                  className="ml-4"
                 >
                   <Download className="w-4 h-4 mr-2" />
                   Download

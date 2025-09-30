@@ -22,16 +22,16 @@ export default function ServerStatus({
 }: ServerStatusProps) {
   return (
     <>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <Card className={isConnected ? "border-green-200 dark:border-green-800 bg-[var(--calendar-date-bg)]" : "border-red-200 dark:border-red-800 bg-[var(--calendar-date-bg)]"}>
-          <CardHeader>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className={isConnected ? "p-5 border-green-200 dark:border-green-800 bg-[var(--calendar-date-bg)]" : "p-5 border-red-200 dark:border-red-800 bg-[var(--calendar-date-bg)]"}>
+          <CardHeader className="pb-3">
             <CardTitle className="flex items-center">
               <Server className={`w-5 h-5 mr-2 ${isConnected ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`} />
               Server Status
             </CardTitle>
             <CardDescription>Current V2Ray server status and uptime</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <div className={`w-3 h-3 rounded-full mr-3 ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
@@ -54,15 +54,15 @@ export default function ServerStatus({
           </CardContent>
         </Card>
 
-        <Card className="bg-[var(--calendar-date-bg)]">
-          <CardHeader>
+        <Card className="p-5 bg-[var(--calendar-date-bg)]">
+          <CardHeader className="pb-3">
             <CardTitle className="flex items-center">
               <Shield className="w-5 h-5 mr-2" />
               Security
             </CardTitle>
             <CardDescription>Security status and encryption settings</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-3">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm">Encryption</span>
@@ -87,15 +87,15 @@ export default function ServerStatus({
         </Card>
       </div>
 
-      <Card className="mb-6 bg-[var(--calendar-date-bg)]">
-        <CardHeader>
+      <Card className="p-5 mt-6 bg-[var(--calendar-date-bg)]">
+        <CardHeader className="pb-3">
           <CardTitle className="flex items-center">
             <Server className="w-5 h-5 mr-2 text-blue-600 dark:text-blue-400" />
             Connection Details
           </CardTitle>
           <CardDescription>Server connection information</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Server Address</p>

@@ -160,6 +160,65 @@ const Calendar: React.FC = () => {
     inputElement.click();
   };
 
+  // Note save function
+  const handleSaveNote = React.useCallback(async () => {
+    if (!quickNote.trim()) return;
+    
+    try {
+      // Save to localStorage as permanent note
+      const newNote = {
+        id: `note_${Date.now()}`,
+        title: 'Permanent Note',
+        content: quickNote.trim(),
+        date: format(selectedDate, "yyyy-MM-dd"),
+        timestamp: Date.now()
+      };
+      
+      const existingNotes = JSON.parse(localStorage.getItem('permanent-notes') || '[]');
+      const updatedNotes = [newNote, ...existingNotes];
+      localStorage.setItem('permanent-notes', JSON.stringify(updatedNotes));
+      
+      console.log("Note saved:", newNote);
+    } catch (error) {
+      console.error('Error saving note to localStorage:', error);
+    }
+    
+    // Reset and close dialog
+    setQuickNote("");
+    setNotePopupOpen(false);
+  }, [quickNote, selectedDate]);
+
+  // Apply formatting to selected text in note
+  const applyFormatting = React.useCallback((prefix: string, suffix: string) => {
+    const textarea = document.getElementById('quick-note') as HTMLTextAreaElement;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = quickNote.substring(start, end);
+    let cursorPos = textarea.selectionStart;
+
+    if (selectedText) {
+      const newText = quickNote.substring(0, start) + prefix + selectedText + suffix + quickNote.substring(end);
+      setQuickNote(newText);
+    } else {
+      cursorPos = textarea.selectionStart;
+      const textBefore = quickNote.substring(0, cursorPos);
+      const textAfter = quickNote.substring(cursorPos);
+      setQuickNote(textBefore + prefix + suffix + textAfter);
+    }
+    
+    textarea.focus();
+    setTimeout(() => {
+      textarea.focus();
+      if (selectedText) {
+        textarea.setSelectionRange(start, end + prefix.length + suffix.length);
+      } else {
+        textarea.setSelectionRange(cursorPos + prefix.length, cursorPos + prefix.length);
+      }
+    }, 0);
+  }, [quickNote]);
+
   const todayEvents = events.filter((event) =>
     isSameDay(parseISO(event.startDate), selectedDate)
   );

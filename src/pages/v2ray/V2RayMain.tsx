@@ -683,74 +683,76 @@ export default function V2RayMain() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
-      <div className="container mx-auto px-3 py-4 md:px-4 md:py-8 w-full md:w-[90%] lg:w-[80%] max-w-6xl">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground py-8">
+      <div className="container mx-auto px-4 py-6 md:px-6 md:py-8 w-full md:w-[90%] lg:w-[80%] max-w-6xl">
         <V2RayHeader isAdmin={isAdmin} isV2RayAdmin={isV2RayAdmin} />
 
-        <ServerConfig
-          serverUrl={serverUrl}
-          setServerUrl={setServerUrl}
-          isConnected={isConnected}
-          setIsConnected={setIsConnected}
-          useProxy={useProxy}
-          setUseProxy={setUseProxy}
-          connectionError={connectionError}
-          buildApiUrl={buildApiUrl}
-          updateProxyConfig={updateProxyConfig}
-          setLoadingConfigs={setLoadingConfigs}
-          setLoadingFiles={setLoadingFiles}
-          setConfigError={setConfigError}
-          setFileError={setFileError}
-          setConfigs={setConfigs}
-          setFiles={setFiles as unknown as (files: any[]) => void} // TODO: Fix type to avoid 'any'
-          isUpdatingProxy={isUpdatingProxy}
-        />
+        <div className="space-y-6">
+          <ServerConfig
+            serverUrl={serverUrl}
+            setServerUrl={setServerUrl}
+            isConnected={isConnected}
+            setIsConnected={setIsConnected}
+            useProxy={useProxy}
+            setUseProxy={setUseProxy}
+            connectionError={connectionError}
+            buildApiUrl={buildApiUrl}
+            updateProxyConfig={updateProxyConfig}
+            setLoadingConfigs={setLoadingConfigs}
+            setLoadingFiles={setLoadingFiles}
+            setConfigError={setConfigError}
+            setFileError={setFileError}
+            setConfigs={setConfigs}
+            setFiles={setFiles as unknown as (files: any[]) => void} // TODO: Fix type to avoid 'any'
+            isUpdatingProxy={isUpdatingProxy}
+          />
 
-        <ServerStatus
-          isConnected={isConnected}
-          serverUrl={serverUrl}
-          useProxy={useProxy}
-          downloadClientFile={downloadClientFile}
-        />
+          <ServerStatus
+            isConnected={isConnected}
+            serverUrl={serverUrl}
+            useProxy={useProxy}
+            downloadClientFile={downloadClientFile}
+          />
 
-        <FileList
-          files={files}
-          loadingFiles={loadingFiles}
-          fileError={fileError}
-          isV2RayAdmin={isV2RayAdmin}
-          isUploading={isUploading}
-          uploadSuccess={uploadSuccess}
-          uploadError={uploadError}
-          testingConfigs={testingConfigs}
-          handleFileUpload={handleFileUpload}
-          triggerFileInput={triggerFileInput}
-          extractConfigsFromFile={extractConfigsFromFile}
-          downloadFile={downloadFile}
-        />
+          <FileList
+            files={files}
+            loadingFiles={loadingFiles}
+            fileError={fileError}
+            isV2RayAdmin={isV2RayAdmin}
+            isUploading={isUploading}
+            uploadSuccess={uploadSuccess}
+            uploadError={uploadError}
+            testingConfigs={testingConfigs}
+            handleFileUpload={handleFileUpload}
+            triggerFileInput={triggerFileInput}
+            extractConfigsFromFile={extractConfigsFromFile}
+            downloadFile={downloadFile}
+          />
 
-        <ConfigList
-          configs={configs}
-          loadingConfigs={loadingConfigs}
-          configError={configError}
-          downloadConfig={downloadConfig}
-        />
+          <ConfigList
+            configs={configs}
+            loadingConfigs={loadingConfigs}
+            configError={configError}
+            downloadConfig={downloadConfig}
+          />
 
-        <ExtractedConfigs files={files} testResults={{}} />
+          <ExtractedConfigs files={files} testResults={{}} />
 
-        <ActionButtons
-          isRestarting={isRestarting}
-          isGenerating={isGenerating}
-          isResetting={isResetting}
-          refreshingPermissions={refreshingPermissions}
-          isV2RayAdmin={isV2RayAdmin}
-          handleRestart={handleRestart}
-          handleGenerate={handleGenerate}
-          handleReset={handleReset}
-          downloadAllConfigs={downloadAllConfigs}
-          refreshUserPermissions={refreshUserPermissions}
-        />
+          <ActionButtons
+            isRestarting={isRestarting}
+            isGenerating={isGenerating}
+            isResetting={isResetting}
+            refreshingPermissions={refreshingPermissions}
+            isV2RayAdmin={isV2RayAdmin}
+            handleRestart={handleRestart}
+            handleGenerate={handleGenerate}
+            handleReset={handleReset}
+            downloadAllConfigs={downloadAllConfigs}
+            refreshUserPermissions={refreshUserPermissions}
+          />
+        </div>
       </div>
-      <div className="h-20"></div>
+      <div className="h-8"></div>
     </div>
   );
 }

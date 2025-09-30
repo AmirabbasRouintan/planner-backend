@@ -33,8 +33,8 @@ export default function ActionButtons({
   refreshUserPermissions
 }: ActionButtonsProps) {
   return (
-    <div className="flex flex-wrap gap-4">
-      <Button onClick={handleRestart} disabled={isRestarting}>
+    <div className="flex flex-wrap gap-3 mb-8">
+      <Button onClick={handleRestart} disabled={isRestarting} className="px-4 py-2">
         {isRestarting ? (
           <>
             <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -48,7 +48,7 @@ export default function ActionButtons({
         )}
       </Button>
       
-      <Button onClick={handleGenerate} variant="outline" disabled={isGenerating}>
+      <Button onClick={handleGenerate} variant="outline" disabled={isGenerating} className="px-4 py-2">
         {isGenerating ? (
           <>
             <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -62,7 +62,7 @@ export default function ActionButtons({
         )}
       </Button>
       
-      <Button onClick={handleReset} variant="outline" disabled={isResetting}>
+      <Button onClick={handleReset} variant="outline" disabled={isResetting} className="px-4 py-2">
         {isResetting ? (
           <>
             <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -76,7 +76,7 @@ export default function ActionButtons({
         )}
       </Button>
 
-      <Button onClick={downloadAllConfigs} variant="outline">
+      <Button onClick={downloadAllConfigs} variant="outline" className="px-4 py-2">
         <Download className="w-4 h-4 mr-2" />
         Download All Configs
       </Button>
@@ -86,6 +86,7 @@ export default function ActionButtons({
           onClick={refreshUserPermissions}
           disabled={refreshingPermissions}
           variant="outline"
+          className="px-4 py-2"
         >
           {refreshingPermissions ? (
             <>
