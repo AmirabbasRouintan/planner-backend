@@ -133,6 +133,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://192.168.100.65:3000",   # React default port
     "http://127.0.0.1:3000",
     "http://185.92.181.112:8000",  # Add your frontend domain
+    "https://planner-peach-ten.vercel.app"
 ]
 
 # Allow all origins (for development only - restrict in production)
