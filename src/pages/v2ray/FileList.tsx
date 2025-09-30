@@ -53,24 +53,24 @@ export default function FileList({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <Card className="mb-6 bg-[var(--calendar-date-bg)]">
-      <CardHeader>
+    <Card className="mb-6 shadow-md rounded-lg overflow-hidden bg-[var(--calendar-date-bg)]">
+      <CardHeader className="px-6 py-4 bg-muted/50">
         <CardTitle className="flex items-center">
           <FileText className="w-5 h-5 mr-2" />
           Server Files
         </CardTitle>
         <CardDescription>Available files on the server</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-6 py-5">
         {isV2RayAdmin && (
-          <div className="mb-6 p-4 border border-dashed rounded-lg">
-            <div className="flex items-center justify-between mb-3">
+          <div className="mb-6 p-5 border border-dashed rounded-lg">
+            <div className="flex items-center justify-between mb-4">
               <h3 className="font-medium flex items-center">
                 <Upload className="w-4 h-4 mr-2" />
                 Upload V2Ray Configuration File
               </h3>
             </div>
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col sm:flex-row gap-4">
               <input
                 type="file"
                 ref={fileInputRef}
@@ -101,7 +101,7 @@ export default function FileList({
               </div>
             </div>
             {(uploadSuccess || uploadError) && (
-              <div className="mt-3">
+              <div className="mt-4">
                 {uploadSuccess && (
                   <Alert variant="default" className="border-green-500 bg-green-500/10">
                     <CheckCircle className="h-4 w-4 text-green-500" />
@@ -122,7 +122,7 @@ export default function FileList({
         )}
         
         {loadingFiles ? (
-          <div className="flex items-center justify-center py-8">
+          <div className="flex items-center justify-center py-10">
             <RefreshCw className="w-6 h-6 animate-spin mr-2" />
             <span>Loading files...</span>
           </div>
@@ -132,17 +132,17 @@ export default function FileList({
             <AlertDescription>{fileError}</AlertDescription>
           </Alert>
         ) : files.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
+          <div className="text-center py-10 text-muted-foreground">
             <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p>No files available</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {files.map((file) => (
-              <div key={file.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-2 md:p-3 border rounded-lg">
-                <div className="flex-1 mb-2 sm:mb-0">
-                  <h4 className="font-medium text-sm md:text-base">{file.name}</h4>
-                  <div className="flex flex-wrap items-center gap-2 md:gap-4 text-xs md:text-sm text-muted-foreground">
+              <div key={file.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                <div className="flex-1 mb-3 sm:mb-0">
+                  <h4 className="font-medium text-base">{file.name}</h4>
+                  <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-1">
                     <span>{(file.size / 1024).toFixed(1)} KB</span>
                     <span className="hidden sm:inline">•</span>
                     <span>By: {file.uploaded_by}</span>
@@ -155,18 +155,18 @@ export default function FileList({
                     onClick={() => extractConfigsFromFile(file)}
                     variant="outline"
                     size="sm"
-                    className="flex-1 sm:flex-none text-xs md:text-sm py-1 h-8"
+                    className="flex-1 sm:flex-none text-sm py-2 h-9"
                     disabled={testingConfigs.includes(file.id)}
                   >
                     {testingConfigs.includes(file.id) ? (
                       <>
-                        <RefreshCw className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2 animate-spin" />
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                         <span className="sm:hidden">Test</span>
                         <span className="hidden sm:inline">Extract Configs</span>
                       </>
                     ) : (
                       <>
-                        <Play className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                        <Play className="w-4 h-4 mr-2" />
                         <span className="sm:hidden">Test</span>
                         <span className="hidden sm:inline">Extract Configs</span>
                       </>
@@ -176,9 +176,9 @@ export default function FileList({
                     onClick={() => downloadFile(file)}
                     variant="outline"
                     size="sm"
-                    className="flex-1 sm:flex-none text-xs md:text-sm py-1 h-8"
+                    className="flex-1 sm:flex-none text-sm py-2 h-9"
                   >
-                    <Download className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                    <Download className="w-4 h-4 mr-2" />
                     Download
                   </Button>
                 </div>

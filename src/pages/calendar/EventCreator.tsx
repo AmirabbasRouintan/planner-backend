@@ -92,6 +92,9 @@ const EventCreator: React.FC<Props> = ({ selectedDate, onSave, onCancel, tempEve
             className="w-full border rounded px-3 py-2 text-sm"
             rows={3}
           />
+          <p className="text-xs text-muted-foreground mt-1">
+            if this Description text box is empty please reload the website or page to fetch to the database
+          </p>
         </div>
 
         <div>
@@ -109,7 +112,7 @@ const EventCreator: React.FC<Props> = ({ selectedDate, onSave, onCancel, tempEve
           <select
             value={color}
             onChange={(e) => setColor(e.target.value)}
-            className="w-full border rounded px-3 py-2 text-sm"
+            className="w-full border rounded px-3 py-2 text-sm bg-black"
           >
             <option value="blue">Blue</option>
             <option value="green">Green</option>

@@ -125,6 +125,9 @@ export function QuickNoteDialog({
                   rows={5}
                   className="resize-none text-sm font-light"
                 />
+                <p className="text-xs text-muted-foreground">
+                  if this Description text box is empty please reload the website or page to fetch to the database
+                </p>
               </div>
               
               {quickNote && (

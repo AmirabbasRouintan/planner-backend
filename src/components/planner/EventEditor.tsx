@@ -155,7 +155,7 @@ export function EventEditor({
                   <SelectTrigger id="category" className="text-sm">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="dark:bg-black">
                     <SelectItem value="_none_">None</SelectItem>
                     {Object.entries(CATEGORIES).map(([id, category]) => (
                       <SelectItem key={id} value={id}>
@@ -181,7 +181,7 @@ export function EventEditor({
                   <SelectTrigger id="reminder" className="text-sm">
                     <SelectValue placeholder="No reminder" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="dark:bg-black">
                     <SelectItem value="_none_">None</SelectItem>
                     {REMINDER_OPTIONS.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
@@ -202,7 +202,7 @@ export function EventEditor({
                 <SelectTrigger id="recurrence" className="text-sm">
                   <SelectValue placeholder="Does not repeat" />
                 </SelectTrigger>
-                <SelectContent className="max-h-40 overflow-y-auto">
+                <SelectContent className="dark:bg-black max-h-40 overflow-y-auto">
                   <SelectItem value="none">Does not repeat</SelectItem>
                   {RECURRENCE_OPTIONS.slice(1).map((option) => (
                     <SelectItem key={option.value} value={option.value}>

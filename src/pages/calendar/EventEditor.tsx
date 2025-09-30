@@ -99,6 +99,9 @@ const EventEditor: React.FC<Props> = ({ event, onSave, onCancel, open, onOpenCha
                 className="w-full border rounded px-3 py-2 text-sm"
                 rows={3}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                if this Description text box is empty please reload the website or page to fetch to the database
+              </p>
             </div>
 
             <div className="flex gap-2">
@@ -118,7 +121,7 @@ const EventEditor: React.FC<Props> = ({ event, onSave, onCancel, open, onOpenCha
               <select
                 value={color}
                 onChange={(e) => setColor(e.target.value as CalendarEvent["color"])}
-                className="w-full border rounded px-3 py-2 text-sm"
+                className="w-full border rounded px-3 py-2 text-sm bg-black"
               >
                 <option value="blue">Blue</option>
                 <option value="green">Green</option>
