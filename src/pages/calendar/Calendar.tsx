@@ -44,9 +44,6 @@ import {
   fetchPermanentNotes,
   createPermanentNote,
   fetchDailyGoals,
-  createDailyGoal,
-  updateDailyGoal,
-  deleteDailyGoal,
   fetchEventTemplates,
   createEventTemplate,
   updateEventTemplate,
@@ -98,11 +95,6 @@ const colorMap: Record<CalendarColor, string> = {
   orange: "#f97316",
   gray: "#64748b",
 };
-
-function formatKey(d: Date | string | number) {
-  const date = new Date(d);
-  return isNaN(date.getTime()) ? "" : date.toISOString().split("T")[0];
-}
 
 const DraggableTemplate: React.FC<{
   template: EventTemplate;
