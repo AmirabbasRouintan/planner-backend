@@ -10,11 +10,12 @@ interface Props {
   event: CalendarEvent | null;
   onSave: (updatedEvent: CalendarEvent) => void;
   onCancel: () => void;
+  onDelete: (id: string) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   }
 
-const EventEditor: React.FC<Props> = ({ event, onSave, onCancel, open, onOpenChange }) => {
+const EventEditor: React.FC<Props> = ({ event, onSave, onCancel, onDelete, open, onOpenChange }) => {
   const [title, setTitle] = React.useState(event?.title || "");
   const [description, setDescription] = React.useState(event?.description || "");
   const [startTime, setStartTime] = React.useState(
@@ -68,6 +69,12 @@ const EventEditor: React.FC<Props> = ({ event, onSave, onCancel, open, onOpenCha
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDelete = () => {
+    if (event && window.confirm("Are you sure you want to delete this event?")) {
+      onDelete(event.id);
     }
   };
 
@@ -142,6 +149,9 @@ const EventEditor: React.FC<Props> = ({ event, onSave, onCancel, open, onOpenCha
             </div>
 
             <div className="flex justify-end gap-2">
+              <Button type="button" variant="destructive" onClick={handleDelete} disabled={isSaving}>
+                Delete
+              </Button>
               <Button type="button" onClick={onCancel} disabled={isSaving}>
                 Cancel
               </Button>

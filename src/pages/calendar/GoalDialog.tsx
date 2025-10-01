@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { Button } from "@/components/ui/button";
 import {
@@ -11,60 +10,69 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { BlockPicker } from 'react-color';
-import type { Goal } from './Goals';
+import type { DailyGoal, CalendarColor } from './types';
 
 interface GoalDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (goal: Partial<Goal> & { title: string; time: string; days: string[]; color: string; description: string; }) => void;
-  goal?: Goal | null;
+  onSave: (goal: Partial<DailyGoal> & { text: string; date: string; priority?: string; category?: string; color?: CalendarColor; notes?: string; targetTime?: number; }) => void;
+  goal?: DailyGoal | null;
 }
 
-const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-const colorfulPalette = [
-  '#D9E3F0', '#F47373', '#697689', '#37D67A', '#2CCCE4', '#555555',
-  '#dce775', '#ff8a65', '#ba68c8', '#4fc3f7', '#a1887f', '#e0e0e0'
-];
-
 export function GoalDialog({ open, onOpenChange, onSave, goal }: GoalDialogProps) {
-  const [title, setTitle] = React.useState('');
-  const [time, setTime] = React.useState('');
-  const [selectedDays, setSelectedDays] = React.useState<string[]>([]);
-  const [color, setColor] = React.useState(colorfulPalette[0]);
-  const [description, setDescription] = React.useState('');
+  const [text, setText] = React.useState('');
+  const [date, setDate] = React.useState(new Date().toISOString().split('T')[0]);
+  const [priority, setPriority] = React.useState('medium');
+  const [category, setCategory] = React.useState('personal');
+  const [color, setColor] = React.useState<CalendarColor>('blue');
+  const [notes, setNotes] = React.useState('');
+  const [targetTime, setTargetTime] = React.useState(60); // Default to 60 minutes
+  const [categories, setCategories] = React.useState(['personal', 'work', 'education', 'health', 'financial']);
 
   React.useEffect(() => {
     if (goal) {
-      setTitle(goal.title);
-      setTime(String(goal.totalTime / 60));
-      setSelectedDays(goal.days);
-      setColor(goal.color);
-      setDescription(goal.description);
+      setText(goal.text);
+      setDate(goal.date);
+      setPriority(goal.priority || 'medium');
+      setCategory(goal.category || 'personal');
+      setColor(goal.color || 'blue');
+      setNotes(goal.notes || '');
+      // Set target time if it exists in notes or set default
+      const timeMatch = goal.notes?.match(/Target time: (\d+) minutes/);
+      if (timeMatch) {
+        setTargetTime(parseInt(timeMatch[1]));
+      } else {
+        setTargetTime(60);
+      }
     } else {
-      setTitle('');
-      setTime('');
-      setSelectedDays([]);
-      setColor(colorfulPalette[0]);
-      setDescription('');
+      setText('');
+      setDate(new Date().toISOString().split('T')[0]);
+      setPriority('medium');
+      setCategory('personal');
+      setNotes('');
+      setTargetTime(60);
     }
   }, [goal, open]);
 
-  const handleDayClick = (day: string) => {
-    setSelectedDays(prev =>
-      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
-    );
-  };
-
   const handleSave = () => {
-    onSave({ id: goal?.id, title, time, days: selectedDays, color, description });
+    // Add target time to notes
+    const notesWithTime = notes ? `${notes}\n\nTarget time: ${targetTime} minutes` : `Target time: ${targetTime} minutes`;
+    
+    onSave({ 
+      id: goal?.id, 
+      text, 
+      date,
+      priority,
+      category,
+      color,
+      notes: notesWithTime,
+      targetTime
+    });
     onOpenChange(false);
   };
 
-  const dialogTitle = goal ? "Edit Daily Goal" : "Add New Daily Goal";
-  const dialogDescription = goal ? "Edit the details of your existing goal." : "Set a new goal you want to track daily.";
+  const dialogTitle = goal ? "Edit Goal" : "Add New Goal";
+  const dialogDescription = goal ? "Edit the details of your existing goal." : "Create a new goal with detailed tracking options.";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -77,53 +85,106 @@ export function GoalDialog({ open, onOpenChange, onSave, goal }: GoalDialogProps
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="goal-title">Goal</Label>
+            <Label htmlFor="goal-text">Goal Title</Label>
             <Input
-              id="goal-title"
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder="e.g., Learn React"
+              id="goal-text"
+              value={text}
+              onChange={e => setText(e.target.value)}
+              placeholder="e.g., Complete Project Documentation"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="goal-time">Time to spend (minutes)</Label>
-            <Input
-              id="goal-time"
-              type="number"
-              value={time}
-              onChange={e => setTime(e.target.value)}
-              placeholder="e.g., 30"
-            />
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="goal-date">Target Date</Label>
+              <Input
+                id="goal-date"
+                type="date"
+                value={date}
+                onChange={e => setDate(e.target.value)}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="goal-target-time">Target Time (minutes)</Label>
+              <Input
+                id="goal-target-time"
+                type="number"
+                min="1"
+                value={targetTime}
+                onChange={e => setTargetTime(Math.max(1, parseInt(e.target.value) || 1))}
+              />
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label>Days of the week</Label>
-            <div className="flex gap-2">
-              {weekDays.map(day => (
-                <Button
-                  key={day}
-                  variant={selectedDays.includes(day) ? "default" : "outline"}
-                  onClick={() => handleDayClick(day)}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="goal-priority">Priority</Label>
+              <select
+                id="goal-priority"
+                value={priority}
+                onChange={e => setPriority(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="goal-category">Category</Label>
+              <div className="flex gap-2">
+                <select
+                  id="goal-category"
+                  value={category}
+                  onChange={e => setCategory(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
-                  {day}
+                  {categories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const newCat = window.prompt('Enter new category name:');
+                    if (newCat && !categories.includes(newCat)) {
+                      setCategories([...categories, newCat]);
+                      setCategory(newCat);
+                    }
+                  }}
+                >
+                  +
                 </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="goal-color">Color</Label>
+            <div className="flex gap-2">
+              {(['blue', 'green', 'red', 'yellow', 'purple', 'orange', 'gray'] as CalendarColor[]).map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setColor(c)}
+                  className={`w-8 h-8 rounded-full ${color === c ? 'ring-2 ring-offset-2 ring-ring' : ''}`}
+                  style={{ backgroundColor: c }}
+                  type="button"
+                  aria-label={`Select ${c} color`}
+                />
               ))}
             </div>
           </div>
+
           <div className="space-y-2">
-            <Label>Color</Label>
-            <BlockPicker
-              colors={colorfulPalette}
-              color={color}
-              onChangeComplete={c => setColor(c.hex)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="goal-description">Description</Label>
-            <Textarea
-              id="goal-description"
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              placeholder="A short description of the goal."
+            <Label htmlFor="goal-notes">Additional Notes</Label>
+            <textarea
+              id="goal-notes"
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Add any additional details or milestones..."
+              className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
           </div>
         </div>
@@ -131,7 +192,7 @@ export function GoalDialog({ open, onOpenChange, onSave, goal }: GoalDialogProps
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave}>{goal ? "Save Changes" : "Add Goal"}</Button>
+          <Button onClick={handleSave}>{goal ? "Save Changes" : "Create Goal"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

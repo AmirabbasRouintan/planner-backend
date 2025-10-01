@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-uer+0@+y3abl7%lot3lqmr$=5e13saz1xtok0ghlt@(tp-it&=
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['185.92.181.112', '127.0.0.1', 'localhost', '*', ".vercel.app","ixiflower32.pythonanywhere.com", "https://planner-peach-ten.vercel.app"]
+ALLOWED_HOSTS = ['185.92.181.112', '127.0.0.1', 'localhost', '*', "http://192.168.1.100:5173", ".vercel.app","ixiflower32.pythonanywhere.com", "https://planner-peach-ten.vercel.app"]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -37,7 +37,11 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'tickets',  # Adding our tickets app
     'corsheaders',  # Adding CORS headers support
+    'authentication',  # Adding authentication app
 ]
+
+# Custom user model
+AUTH_USER_MODEL = 'authentication.User'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -80,6 +84,12 @@ DATABASES = {
     }
 }
 
+
+# Authentication backends
+AUTHENTICATION_BACKENDS = [
+    'authentication.backends.EmailBackend',
+    'django.contrib.auth.backends.ModelBackend',  # Keep the default backend as fallback
+]
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators

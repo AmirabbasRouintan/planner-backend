@@ -33,7 +33,7 @@ export function QuickNoteDialog({
 }: QuickNoteDialogProps) {
   return (
     <Dialog open={notePopupOpen} onOpenChange={setNotePopupOpen}>
-      <DialogContent className="max-w-2xl max-h-[85vh] mx-2 sm:mx-0">
+      <DialogContent className="max-w-3xl max-h-[90vh] mx-2 sm:mx-0">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
@@ -47,50 +47,8 @@ export function QuickNoteDialog({
             </DialogTitle>
           </div>
         </DialogHeader>
-        <div className="grid gap-3 sm:gap-4 py-3 sm:py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
-            <div className="flex gap-1 sm:gap-2 flex-wrap">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => applyFormatting('# ', '')}
-                className="text-xs px-2 py-1 h-7 sm:h-8"
-              >
-                H1
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => applyFormatting('**', '**')}
-                className="text-xs font-bold px-2 py-1 h-7 sm:h-8"
-              >
-                B
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => applyFormatting('*', '*')}
-                className="text-xs underline px-2 py-1 h-7 sm:h-8"
-              >
-                I
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => applyFormatting('~~', '~~')}
-                className="text-xs line-through px-2 py-1 h-7 sm:h-8"
-              >
-                S
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => applyFormatting('\n- [ ] ', '')}
-                className="text-xs px-2 py-1 h-7 sm:h-8"
-              >
-                ☑
-              </Button>
-            </div>
+        <div className="grid gap-3 sm:gap-4 py-2 sm:py-3">
+          <div className="flex justify-end mb-2">
             <div className="flex items-center gap-2">
               <Label htmlFor="note-preview-toggle" className="text-xs sm:text-sm">
                 {notePreviewMode ? "Preview" : "Edit"}
@@ -115,6 +73,48 @@ export function QuickNoteDialog({
           
           {!notePreviewMode ? (
             <div className="grid gap-3 sm:gap-4">
+              <div className="flex gap-1 sm:gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => applyFormatting('# ', '')}
+                  className="text-xs px-2 py-1 h-7 sm:h-8"
+                >
+                  H1
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => applyFormatting('**', '**')}
+                  className="text-xs font-bold px-2 py-1 h-7 sm:h-8"
+                >
+                  B
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => applyFormatting('*', '*')}
+                  className="text-xs underline px-2 py-1 h-7 sm:h-8"
+                >
+                  I
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => applyFormatting('~~', '~~')}
+                  className="text-xs line-through px-2 py-1 h-7 sm:h-8"
+                >
+                  S
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => applyFormatting('\n- [ ] ', '')}
+                  className="text-xs px-2 py-1 h-7 sm:h-8"
+                >
+                  ☑
+                </Button>
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="quick-note" className="text-sm sm:text-base">Note Content</Label>
                 <Textarea
@@ -152,9 +152,8 @@ export function QuickNoteDialog({
               )}
             </div>
           ) : (
-            <div className="grid gap-2">
-              <Label className="text-sm sm:text-base">Preview</Label>
-              <div className="border rounded-md p-2 sm:p-3 bg-muted/30 min-h-[200px] sm:min-h-[300px] max-h-[300px] sm:max-h-[400px] overflow-y-auto">
+            <div className="grid gap-0">
+              <div className="border rounded-md p-3 sm:p-4 bg-muted/30 min-h-[250px] sm:min-h-[400px] max-h-[400px] sm:max-h-[600px] overflow-y-auto">
                 <div className="prose prose-xs sm:prose-sm dark:prose-invert max-w-none">
                   {quickNote ? (
                     <div dangerouslySetInnerHTML={{
@@ -177,15 +176,34 @@ export function QuickNoteDialog({
           )}
         </div>
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => {
-            setQuickNote("");
-            setNotePopupOpen(false);
-          }} className="text-sm sm:text-base">
-            Cancel
-          </Button>
-          <Button onClick={handleSaveNote} disabled={!quickNote.trim()} className="text-sm sm:text-base">
-            Save Permanent Note
-          </Button>
+          {notePreviewMode ? (
+            <Button 
+              onClick={() => setNotePopupOpen(false)} 
+              className="text-sm sm:text-base"
+            >
+              OK
+            </Button>
+          ) : (
+            <>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setQuickNote("");
+                  setNotePopupOpen(false);
+                }} 
+                className="text-sm sm:text-base"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSaveNote} 
+                disabled={!quickNote.trim()} 
+                className="text-sm sm:text-base"
+              >
+                Save Permanent Note
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

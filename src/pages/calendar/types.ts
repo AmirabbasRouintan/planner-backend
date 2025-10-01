@@ -11,3 +11,30 @@ export interface CalendarEvent {
 }
 
 export const initialEvents: CalendarEvent[] = [];
+
+export interface EventTemplate {
+  id: number;
+  name: string;
+  title: string;
+  color: CalendarColor;
+}
+
+export interface PermanentNote {
+  id: number;
+  title: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DailyGoal {
+  id: number;
+  text: string;
+  completed: boolean;
+  date: string;
+  priority?: string;
+  category?: string;
+  color?: CalendarColor;
+  notes?: string;
+  targetTime?: number; // Target time in minutes
+}

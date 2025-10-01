@@ -1,15 +1,12 @@
 import * as React from "react";
 import { format, parseISO, isSameDay } from "date-fns";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { updateTask } from "./api";
 import { getEventsForDay } from "./utils";
-import type { CalendarEvent } from "./types";
+import type { CalendarEvent, EventTemplate } from "./types";
+import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import { setHours, startOfHour, addHours } from 'date-fns';
 import EventBlock from "./EventBlock";
 import EventCreator from "./EventCreator";
 import EventEditor from "./EventEditor";
@@ -21,6 +18,61 @@ interface Props {
   setEvents: React.Dispatch<React.SetStateAction<CalendarEvent[]>>;
   token?: string;
 }
+
+const DroppableHourSlot: React.FC<{
+  hour: number;
+  selectedDate: Date;
+  setEvents: React.Dispatch<React.SetStateAction<CalendarEvent[]>>;
+  children: React.ReactNode;
+  onDoubleClick: (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => void;
+  handleCreateEvent: (event: CalendarEvent) => Promise<void>;
+}> = ({ hour, selectedDate, setEvents, children, onDoubleClick, handleCreateEvent }) => {
+  const ref = React.useRef<HTMLDivElement | null>(null);
+  const [isDraggedOver, setIsDraggedOver] = React.useState(false);
+
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    return dropTargetForElements({
+      element: el,
+      getData: () => ({ hour }),
+      onDragEnter: () => setIsDraggedOver(true),
+      onDragLeave: () => setIsDraggedOver(false),
+      onDrop: ({ source }) => {
+        const { template } = source.data as { template: EventTemplate };
+        if (!template) return;
+
+        const startDate = startOfHour(setHours(selectedDate, hour));
+        const endDate = addHours(startDate, 1);
+
+        const newEvent: CalendarEvent = {
+          id: `temp-${Date.now()}`,
+          title: template.title,
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+          color: template.color,
+          isImportant: false,
+          description: "",
+        };
+
+        handleCreateEvent(newEvent);
+        setIsDraggedOver(false);
+      },
+    });
+  }, [hour, selectedDate, setEvents, handleCreateEvent]);
+
+  return (
+    <div
+      ref={ref}
+      className={`relative border-b ${isDraggedOver ? 'bg-primary/20' : ''}`}
+      style={{ height: "48px", minHeight: "48px" }}
+      onDoubleClick={onDoubleClick}
+    >
+      {children}
+    </div>
+  );
+};
 
 const CalendarDayView: React.FC<Props> = ({
   selectedDate,
@@ -441,10 +493,12 @@ const CalendarDayView: React.FC<Props> = ({
             )}
 
             {hours.map((hour) => (
-              <div
+              <DroppableHourSlot
                 key={hour}
-                className="relative border-b"
-                style={{ height: "48px", minHeight: "48px" }}
+                hour={hour}
+                selectedDate={selectedDate}
+                setEvents={setEvents}
+                handleCreateEvent={handleCreateEvent}
                 onDoubleClick={(e) => {
                   if (e.target === e.currentTarget) {
                     const rect = e.currentTarget.getBoundingClientRect();
@@ -501,7 +555,7 @@ const CalendarDayView: React.FC<Props> = ({
                       isDraggingId={draggingEventId}
                       />
                   ))}
-              </div>
+              </DroppableHourSlot>
             ))}
           </div>
         </div>
@@ -512,6 +566,7 @@ const CalendarDayView: React.FC<Props> = ({
           event={editingEvent}
           onSave={saveEvent}
           onCancel={closeEditor}
+          onDelete={deleteEvent}
           open={!!editingEvent}
           onOpenChange={(open) => !open && closeEditor()}
         />

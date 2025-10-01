@@ -31,7 +31,11 @@ import {
   Settings,
   HelpCircle,
   LogOut,
-  Star
+  Star,
+  Send,
+  LayoutTemplate,
+  PanelRight,
+  Archive
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +61,22 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { CalendarNotifications } from "@/components/calendar/calendar-notifications";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Link } from "react-router-dom";
 import type { CalendarEvent } from "./types";
 
 interface CalendarNavProps {
@@ -69,6 +89,7 @@ interface CalendarNavProps {
     is_admin?: boolean;
     is_v2ray_admin?: boolean;
     has_v2ray_access?: boolean;
+    profile_picture?: string;
   } | null;
   logout: () => void;
   selectedDate: Date;
@@ -85,6 +106,10 @@ interface CalendarNavProps {
   todayEvents: CalendarEvent[];
   importantEvents: CalendarEvent[];
   isScrolled: boolean;
+  isSearchOpen: boolean;
+  setIsSearchOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  isMobileMenuOpen: boolean;
+  setIsMobileMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
   activeSection: string;
   setActiveSection: React.Dispatch<React.SetStateAction<string>>;
 }
@@ -112,6 +137,8 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
 }) => {
   const [leftOpen, setLeftOpen] = React.useState(false);
   const [rightOpen, setRightOpen] = React.useState(false);
+  const [isTelegramDialogOpen, setIsTelegramDialogOpen] = React.useState(false);
+  const [telegramUsername, setTelegramUsername] = React.useState("");
 
   // Navigation items
   const navItems = [
@@ -132,6 +159,16 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
       .slice(0, 2);
   };
 
+  // Function to get profile image URL
+  const getProfileImageUrl = () => {
+    if (user?.profile_picture) {
+      const baseUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+      const path = user.profile_picture.replace(/^\/+/, '');
+      return `${baseUrl}/${path}`;
+    }
+    return null;
+  };
+
   const ProfileDropdown = () => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -140,9 +177,17 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
           className="relative h-10 w-10 rounded-lg p-0 hover:bg-muted/50 transition-all duration-200"
           aria-label="User menu"
         >
-          <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-muted text-foreground font-medium text-sm">
-            {getUserInitials()}
-          </div>
+          {getProfileImageUrl() ? (
+            <img
+              src={getProfileImageUrl()!}
+              alt={user?.name || 'Profile'}
+              className="h-10 w-10 rounded-lg object-cover border-2 border-border"
+            />
+          ) : (
+            <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-muted text-foreground font-medium text-sm">
+              {getUserInitials()}
+            </div>
+          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
@@ -160,9 +205,18 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
           </div>
         </div>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="flex items-center gap-3">
-          <Settings className="w-4 h-4" />
-          Settings
+        <Link to="/settings">
+          <DropdownMenuItem className="flex items-center gap-3">
+            <Settings className="w-4 h-4" />
+            Settings
+          </DropdownMenuItem>
+        </Link>
+        <DropdownMenuItem
+          onSelect={() => setIsTelegramDialogOpen(true)}
+          className="flex items-center gap-3"
+        >
+          <Send className="w-4 h-4" />
+          Connect to Telegram
         </DropdownMenuItem>
         <DropdownMenuItem className="flex items-center gap-3">
           <HelpCircle className="w-4 h-4" />
@@ -219,6 +273,33 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
                         </Button>
                       );
                     })}
+                    <Collapsible>
+                      <CollapsibleTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start h-10"
+                        >
+                          <LayoutTemplate className="mr-3 h-4 w-4" />
+                          Templates
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="pl-8 space-y-1 pt-2">
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start h-9"
+                          >
+                            - Event Template 1
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start h-9"
+                          >
+                            - Event Template 2
+                          </Button>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
                     <Separator />
                     <CalendarNotifications
                       events={events.map((event) => ({
@@ -236,7 +317,7 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
                         setLeftOpen(false);
                       }}
                     >
-                      <CheckSquare className="mr-3 h-4 w-4" />
+                      <PanelRight className="mr-3 h-4 w-4" />
                       Checklist
                     </Button>
                     <Button
@@ -435,9 +516,17 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
                       Profile & Settings
                     </h3>
                     <div className="flex items-center gap-4">
-                      <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-muted text-foreground font-medium">
-                        {getUserInitials()}
-                      </div>
+                      {getProfileImageUrl() ? (
+                        <img
+                          src={getProfileImageUrl()!}
+                          alt={user?.name || 'Profile'}
+                          className="h-10 w-10 rounded-lg object-cover border-2 border-border"
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-muted text-foreground font-medium">
+                          {getUserInitials()}
+                        </div>
+                      )}
                       <div>
                         <p className="font-medium">{user?.name || "User"}</p>
                         <p className="text-sm text-muted-foreground">
@@ -515,7 +604,7 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
                     className="h-9"
                     onClick={() => setShowChecklist(!showChecklist)}
                   >
-                    <CheckSquare className="h-4 w-4" />
+                    <PanelRight className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
@@ -706,22 +795,27 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
                       }`}
                     />
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9"
-                    onClick={handleImport}
-                  >
-                    <Upload className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9"
-                    onClick={handleExport}
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-9"
+                      >
+                        <Archive className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={handleImport}>
+                        <Upload className="mr-2 h-4 w-4" />
+                        <span>Import</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleExport}>
+                        <Download className="mr-2 h-4 w-4" />
+                        <span>Export</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Button
                     size="sm"
                     className="h-9"
@@ -741,6 +835,63 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
           </div>
         </header>
       )}
+      <Dialog open={isTelegramDialogOpen} onOpenChange={setIsTelegramDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Connect to Telegram</DialogTitle>
+            <DialogDescription>
+              this part is for when the alert dose not working and the telgegram
+              bot will alert you
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="flex flex-col space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Click the link below to start the bot, then enter your Telegram
+                username here to sync your account.
+              </p>
+              <a
+                href="https://t.me/Ixi_flower_bot"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:underline"
+              >
+                @Ixi_flower_bot
+              </a>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="telegram-username" className="text-right">
+                Username
+              </Label>
+              <Input
+                id="telegram-username"
+                value={telegramUsername}
+                onChange={(e) => setTelegramUsername(e.target.value)}
+                className="col-span-3"
+                placeholder="Your Telegram username"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsTelegramDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              onClick={() => {
+                // Here you would typically save the username
+                console.log("Telegram username to save:", telegramUsername);
+                setIsTelegramDialogOpen(false);
+              }}
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

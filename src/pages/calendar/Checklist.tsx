@@ -28,8 +28,9 @@ const Checklist: React.FC<Props> = ({ token }) => {
           "Content-Type": "application/json",
         };
         
+        // Use the token directly as it's already formatted in the AuthContext
         if (token) {
-          headers["Authorization"] = `Token ${token}`;
+          headers["Authorization"] = token;
           console.log("Setting Authorization header:", headers["Authorization"]);
         } else {
           console.log("No token provided");
@@ -59,6 +60,8 @@ const Checklist: React.FC<Props> = ({ token }) => {
 
     if (token) {
       fetchChecklistItems();
+    } else {
+      setLoading(false);
     }
   }, [token]);
 
@@ -69,8 +72,9 @@ const Checklist: React.FC<Props> = ({ token }) => {
           "Content-Type": "application/json",
         };
         
+        // Use the token directly as it's already formatted in the AuthContext
         if (token) {
-          headers["Authorization"] = `Token ${token}`;
+          headers["Authorization"] = token;
         }
         
         const response = await fetch(`${API_URL}/checklist/`, {
@@ -105,8 +109,9 @@ const Checklist: React.FC<Props> = ({ token }) => {
         "Content-Type": "application/json",
       };
       
+      // Use the token directly as it's already formatted in the AuthContext
       if (token) {
-        headers["Authorization"] = `Token ${token}`;
+        headers["Authorization"] = token;
       }
       
       const response = await fetch(`${API_URL}/checklist/${id}/`, {
@@ -138,8 +143,9 @@ const Checklist: React.FC<Props> = ({ token }) => {
         "Content-Type": "application/json",
       };
       
+      // Use the token directly as it's already formatted in the AuthContext
       if (token) {
-        headers["Authorization"] = `Token ${token}`;
+        headers["Authorization"] = token;
       }
       
       const response = await fetch(`${API_URL}/checklist/${id}/`, {

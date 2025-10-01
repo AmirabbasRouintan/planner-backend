@@ -30,4 +30,8 @@ urlpatterns = [
     path('api/daily-events/', views.user_daily_events_api, name='user_daily_events_api'),
     path('api/checklist/', views.checklist_api, name='checklist_api'),
     path('api/checklist/<int:item_id>/', views.checklist_item_api, name='checklist_item_api'),
+    path('api/daily-goals/', views.daily_goals_api, name='daily_goals_api'),
+    path('api/daily-goals/<int:goal_id>/', views.daily_goal_detail_api, name='daily_goal_detail_api'),
+    path('api/event-templates/', views.event_templates_api, name='event_templates_api'),
+    path('api/event-templates/<int:template_id>/', views.event_template_detail_api, name='event_template_detail_api'),
 ]

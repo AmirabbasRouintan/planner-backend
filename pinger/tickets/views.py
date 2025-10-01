@@ -15,16 +15,27 @@ from django.db.models import Q
 import json
 import os
 from datetime import datetime
-from .models import Ticket, ConfigFile, V2RayConfig, UserProfile, PermanentNote, Task, Token, ChecklistItem
+from .models import Ticket, ConfigFile, V2RayConfig, UserProfile, PermanentNote, Task, Token, ChecklistItem, DailyGoal, EventTemplate
 
 
 def add_cors_headers(view_func):
     """Decorator to add CORS headers to API responses"""
     def wrapper(request, *args, **kwargs):
+        # Debug: log incoming origin
+        try:
+            incoming_origin = request.META.get('HTTP_ORIGIN')
+            print(f'DEBUG add_cors_headers - incoming Origin: {incoming_origin}')
+        except Exception:
+            incoming_origin = None
+
         response = view_func(request, *args, **kwargs)
-        
+
+        # Get the origin from the request or use the development URL as fallback
+        origin = request.META.get('HTTP_ORIGIN', 'http://localhost:5173')
+        print(f'DEBUG add_cors_headers - setting Access-Control-Allow-Origin to: {origin}')
+
         # Add CORS headers
-        response['Access-Control-Allow-Origin'] = '*'
+        response['Access-Control-Allow-Origin'] = origin
         response['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
         response['Access-Control-Allow-Headers'] = 'Content-Type, X-Admin-Password, Authorization'
         response['Access-Control-Allow-Credentials'] = 'true'
@@ -32,7 +43,7 @@ def add_cors_headers(view_func):
         # Handle preflight OPTIONS requests
         if request.method == 'OPTIONS':
             response = JsonResponse({'status': 'ok'})
-            response['Access-Control-Allow-Origin'] = '*'
+            response['Access-Control-Allow-Origin'] = origin
             response['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
             response['Access-Control-Allow-Headers'] = 'Content-Type, X-Admin-Password, Authorization'
             response['Access-Control-Allow-Credentials'] = 'true'
@@ -51,6 +62,12 @@ def task_api(request):
     
     # Check if user is authenticated either via session or token
     user = None
+    # Debug: log incoming auth header and cookies
+    try:
+        print('DEBUG task_api - HTTP_AUTHORIZATION:', request.META.get('HTTP_AUTHORIZATION'))
+        print('DEBUG task_api - HTTP_COOKIE:', request.META.get('HTTP_COOKIE'))
+    except Exception as _:
+        pass
     if request.user.is_authenticated:
         user = request.user
     else:
@@ -505,18 +522,8 @@ def api_login(request):
                     'message': 'Email and password are required'
                 }, status=400)
             
-            # Try to find user by email
-            try:
-                user = User.objects.get(email=email)
-                username = user.username
-            except User.DoesNotExist:
-                return JsonResponse({
-                    'status': 'error',
-                    'message': 'Invalid email or password'
-                }, status=401)
-            
-            # Authenticate user
-            user = authenticate(request, username=username, password=password)
+            # Authenticate user directly with email (using our custom EmailBackend)
+            user = authenticate(request, username=email, password=password)
             
             if user is not None:
                 login(request, user)
@@ -525,11 +532,17 @@ def api_login(request):
                 token, created = Token.objects.get_or_create(user=user)
                 
                 # Check if user has a profile
+                profile = getattr(user, 'profile', None)
                 is_v2ray_admin = False
                 has_v2ray_access = True  # Default value
-                if hasattr(user, 'profile'):
-                    is_v2ray_admin = user.profile.is_v2ray_admin
-                    has_v2ray_access = user.profile.has_v2ray_access
+                
+                if profile:
+                    is_v2ray_admin = profile.is_v2ray_admin
+                    has_v2ray_access = profile.has_v2ray_access
+                else:
+                    # Create profile if it doesn't exist
+                    from .models import UserProfile
+                    profile = UserProfile.objects.create(user=user)
                 
                 # Return user data and token
                 return JsonResponse({
@@ -557,9 +570,12 @@ def api_login(request):
                 'message': 'Invalid JSON data'
             }, status=400)
         except Exception as e:
+            import traceback
+            print('Login error:', str(e))
+            print('Traceback:', traceback.format_exc())
             return JsonResponse({
                 'status': 'error',
-                'message': str(e)
+                'message': 'An unexpected error occurred. Please try again later.'
             }, status=500)
     
     return JsonResponse({
@@ -669,7 +685,7 @@ def api_update_profile(request):
     """
     API endpoint for updating user profile
     """
-    if request.method == 'PATCH':
+    if request.method == 'POST' or request.method == 'PATCH':
         try:
             # Get token from Authorization header
             auth_header = request.META.get('HTTP_AUTHORIZATION', '')
@@ -679,7 +695,7 @@ def api_update_profile(request):
                     'message': 'Authentication required'
                 }, status=401)
             
-            token = auth_header.split(' ')[1]
+            token_key = auth_header.split(' ')[1]
             
             # Validate token and get user
             try:
@@ -690,29 +706,26 @@ def api_update_profile(request):
                     'status': 'error',
                     'message': 'Invalid token'
                 }, status=401)
-            
-            data = json.loads(request.body)
-            name = data.get('name', '')
-            
-            if not name.strip():
-                return JsonResponse({
-                    'status': 'error',
-                    'message': 'Name cannot be empty'
-                }, status=400)
-            
-            # The user is already obtained from the token
-            # No need to fetch user again
-            
-            # Update user name
-            if name:
-                name_parts = name.split(' ', 1)
-                user.first_name = name_parts[0]
-                if len(name_parts) > 1:
-                    user.last_name = name_parts[1]
-                else:
-                    user.last_name = ''
-                user.save()
-            
+
+            # Get or create user profile
+            user_profile, created = UserProfile.objects.get_or_create(user=user)
+
+            if request.content_type == 'application/json':
+                data = json.loads(request.body)
+                if 'new_password' in data:
+                    if not user.check_password(data['current_password']):
+                        return JsonResponse({'error': 'Invalid current password'}, status=400)
+                    user.set_password(data['new_password'])
+                    user.save()
+            else:
+                if 'username' in request.POST:
+                    user.username = request.POST['username']
+                    user.save()
+
+                if 'profile_picture' in request.FILES:
+                    user_profile.profile_picture = request.FILES['profile_picture']
+                    user_profile.save()
+
             return JsonResponse({
                 'status': 'success',
                 'message': 'Profile updated successfully',
@@ -722,15 +735,11 @@ def api_update_profile(request):
                     'email': user.email,
                     'name': user.first_name + ' ' + user.last_name if user.first_name or user.last_name else '',
                     'is_admin': user.is_staff,
-                    'is_v2ray_admin': user.profile.is_v2ray_admin if hasattr(user, 'profile') else False
+                    'is_v2ray_admin': user.profile.is_v2ray_admin if hasattr(user, 'profile') else False,
+                    'profile_picture': user_profile.profile_picture.url if user_profile.profile_picture else None
                 }
             })
             
-        except json.JSONDecodeError:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'Invalid JSON data'
-            }, status=400)
         except Exception as e:
             return JsonResponse({
                 'status': 'error',
@@ -1164,12 +1173,25 @@ def api_permanent_notes(request):
     GET: Retrieve all notes for the authenticated user
     POST: Create a new note for the authenticated user
     """
-    if not request.user.is_authenticated:
+    user = None
+    if request.user.is_authenticated:
+        user = request.user
+    else:
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if auth_header.startswith('Token '):
+            token_key = auth_header.split(' ')[1]
+            try:
+                token = Token.objects.get(key=token_key)
+                user = token.user
+            except Token.DoesNotExist:
+                pass
+
+    if not user:
         return JsonResponse({'error': 'Authentication required'}, status=401)
     
     if request.method == 'GET':
         try:
-            notes = PermanentNote.objects.filter(user=request.user)
+            notes = PermanentNote.objects.filter(user=user)
             notes_data = [
                 {
                     'id': note.id,
@@ -1194,7 +1216,7 @@ def api_permanent_notes(request):
                 return JsonResponse({'error': 'Content is required'}, status=400)
             
             note = PermanentNote.objects.create(
-                user=request.user,
+                user=user,
                 title=title,
                 content=content
             )
@@ -1221,11 +1243,24 @@ def api_permanent_note_detail(request, note_id):
     PUT: Update a specific note
     DELETE: Delete a specific note
     """
-    if not request.user.is_authenticated:
+    user = None
+    if request.user.is_authenticated:
+        user = request.user
+    else:
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if auth_header.startswith('Token '):
+            token_key = auth_header.split(' ')[1]
+            try:
+                token = Token.objects.get(key=token_key)
+                user = token.user
+            except Token.DoesNotExist:
+                pass
+
+    if not user:
         return JsonResponse({'error': 'Authentication required'}, status=401)
     
     try:
-        note = PermanentNote.objects.get(id=note_id, user=request.user)
+        note = PermanentNote.objects.get(id=note_id, user=user)
     except PermanentNote.DoesNotExist:
         return JsonResponse({'error': 'Note not found'}, status=404)
     
@@ -1408,3 +1443,227 @@ def checklist_item_api(request, item_id):
     
     # Invalid method
     return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@csrf_exempt
+@add_cors_headers
+def daily_goals_api(request):
+    user = None
+    if request.user.is_authenticated:
+        user = request.user
+    else:
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if auth_header.startswith('Token '):
+            token_key = auth_header.split(' ')[1]
+            try:
+                token = Token.objects.get(key=token_key)
+                user = token.user
+            except Token.DoesNotExist:
+                pass
+
+    if not user:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    if request.method == 'GET':
+        goals = DailyGoal.objects.filter(user=user)
+        data = [{'id': goal.id, 'text': goal.text, 'completed': goal.completed, 'date': goal.date.isoformat()} for goal in goals]
+        return JsonResponse(data, safe=False)
+
+    elif request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            print(f"Received data for daily goal creation: {data}")  # Debug log
+            
+            # Validate required fields
+            if 'text' not in data or not data['text'].strip():
+                return JsonResponse({'error': 'Text field is required'}, status=400)
+                
+            if 'date' not in data or not data['date']:
+                return JsonResponse({'error': 'Date field is required'}, status=400)
+            
+            # Validate date format
+            try:
+                from datetime import datetime
+                datetime.strptime(data['date'], '%Y-%m-%d')
+            except ValueError:
+                return JsonResponse({'error': 'Invalid date format. Expected YYYY-MM-DD'}, status=400)
+            
+            # Extract target time from notes if present
+            target_time = data.get('targetTime')
+            if not target_time and data.get('notes'):
+                # Try to extract from notes
+                import re
+                time_match = re.search(r'Target time: (\d+) minutes', data.get('notes', ''))
+                if time_match:
+                    target_time = int(time_match.group(1))
+            
+            # Create the goal with defaults for optional fields
+            goal = DailyGoal.objects.create(
+                user=user,
+                text=data['text'].strip(),
+                date=data['date'],
+                completed=bool(data.get('completed', False)),
+                priority=data.get('priority', 'medium') if data.get('priority') in dict(DailyGoal.PRIORITY_CHOICES) else 'medium',
+                category=data.get('category', 'personal') or 'personal',
+                color=data.get('color', 'blue') if data.get('color') in dict(DailyGoal.COLOR_CHOICES) else 'blue',
+                notes=data.get('notes', '') or '',
+                target_time=target_time
+            )
+            return JsonResponse({
+                'id': goal.id, 
+                'text': goal.text, 
+                'completed': goal.completed, 
+                'date': goal.date.isoformat(),
+                'priority': goal.priority,
+                'category': goal.category,
+                'color': goal.color,
+                'notes': goal.notes,
+                'targetTime': goal.target_time
+            }, status=201)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+        except KeyError as e:
+            return JsonResponse({'error': f'Missing required field: {str(e)}'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+
+@csrf_exempt
+@add_cors_headers
+def daily_goal_detail_api(request, goal_id):
+    user = None
+    if request.user.is_authenticated:
+        user = request.user
+    else:
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if auth_header.startswith('Token '):
+            token_key = auth_header.split(' ')[1]
+            try:
+                token = Token.objects.get(key=token_key)
+                user = token.user
+            except Token.DoesNotExist:
+                pass
+
+    if not user:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    try:
+        goal = DailyGoal.objects.get(id=goal_id, user=user)
+    except DailyGoal.DoesNotExist:
+        return JsonResponse({'error': 'Goal not found'}, status=404)
+
+    if request.method == 'PUT':
+        try:
+            data = json.loads(request.body)
+            
+            # Extract target time from notes if present
+            target_time = data.get('targetTime')
+            if not target_time and data.get('notes'):
+                import re
+                time_match = re.search(r'Target time: (\d+) minutes', data.get('notes', ''))
+                if time_match:
+                    target_time = int(time_match.group(1))
+            
+            # Update all fields
+            goal.text = data.get('text', goal.text)
+            goal.completed = data.get('completed', goal.completed)
+            goal.date = data.get('date', goal.date)
+            goal.priority = data.get('priority', goal.priority) if data.get('priority') in dict(DailyGoal.PRIORITY_CHOICES) else goal.priority
+            goal.category = data.get('category', goal.category)
+            goal.color = data.get('color', goal.color) if data.get('color') in dict(DailyGoal.COLOR_CHOICES) else goal.color
+            goal.notes = data.get('notes', goal.notes)
+            goal.target_time = target_time if target_time is not None else goal.target_time
+            goal.save()
+            
+            return JsonResponse({
+                'id': goal.id,
+                'text': goal.text,
+                'completed': goal.completed,
+                'date': goal.date.isoformat(),
+                'priority': goal.priority,
+                'category': goal.category,
+                'color': goal.color,
+                'notes': goal.notes,
+                'targetTime': goal.target_time
+            })
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+
+    elif request.method == 'DELETE':
+        goal.delete()
+        return JsonResponse({'status': 'success'}, status=204)
+
+@csrf_exempt
+@add_cors_headers
+def event_templates_api(request):
+    user = None
+    if request.user.is_authenticated:
+        user = request.user
+    else:
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if auth_header.startswith('Token '):
+            token_key = auth_header.split(' ')[1]
+            try:
+                token = Token.objects.get(key=token_key)
+                user = token.user
+            except Token.DoesNotExist:
+                pass
+
+    if not user:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    if request.method == 'GET':
+        templates = EventTemplate.objects.filter(user=user)
+        data = [{'id': t.id, 'name': t.name, 'title': t.title, 'color': t.color} for t in templates]
+        return JsonResponse(data, safe=False)
+
+    elif request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            template = EventTemplate.objects.create(
+                user=user,
+                name=data['name'],
+                title=data['title'],
+                color=data.get('color', 'blue')
+            )
+            return JsonResponse({'id': template.id, 'name': template.name, 'title': template.title, 'color': template.color}, status=201)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+
+@csrf_exempt
+@add_cors_headers
+def event_template_detail_api(request, template_id):
+    user = None
+    if request.user.is_authenticated:
+        user = request.user
+    else:
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if auth_header.startswith('Token '):
+            token_key = auth_header.split(' ')[1]
+            try:
+                token = Token.objects.get(key=token_key)
+                user = token.user
+            except Token.DoesNotExist:
+                pass
+
+    if not user:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    try:
+        template = EventTemplate.objects.get(id=template_id, user=user)
+    except EventTemplate.DoesNotExist:
+        return JsonResponse({'error': 'Template not found'}, status=404)
+
+    if request.method == 'DELETE':
+        template.delete()
+        return JsonResponse({'status': 'success'}, status=204)
+
+    # Allow updating an existing template via PUT
+    elif request.method == 'PUT':
+        try:
+            data = json.loads(request.body)
+            template.name = data.get('name', template.name)
+            template.title = data.get('title', template.title)
+            template.color = data.get('color', template.color)
+            template.save()
+            return JsonResponse({'id': template.id, 'name': template.name, 'title': template.title, 'color': template.color})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)

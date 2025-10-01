@@ -10,22 +10,57 @@ import {
   ChevronUp,
   Clock,
   Star,
-  Pin
+  Pin,
+  Bell,
+  LayoutTemplate,
+  Target,
+  Notebook,
+  Plus,
+  Edit3,
 } from "lucide-react";
+import alertSound from "@/assets/alert.mp3";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
-  DialogTitle
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { useAuth } from "@/contexts/AuthContext";
-import { fetchAllEvents, fetchTasks, deleteTask } from "./api";
+import {
+  fetchAllEvents,
+  fetchTasks,
+  deleteTask,
+  fetchPermanentNotes,
+  createPermanentNote,
+  fetchDailyGoals,
+  createDailyGoal,
+  updateDailyGoal,
+  deleteDailyGoal,
+  fetchEventTemplates,
+  createEventTemplate,
+  updateEventTemplate,
+  deleteEventTemplate,
+} from "./api";
 import { initialEvents } from "./types";
-import type { CalendarEvent } from "./types";
+import type {
+  CalendarEvent,
+  EventTemplate,
+  CalendarColor,
+  DailyGoal,
+  PermanentNote,
+} from "./types";
+import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import CalendarDayView from "./CalendarDayView";
 import Checklist from "./Checklist";
 import { CalendarNav } from "./CalendarNav";
@@ -33,19 +68,106 @@ import { Goals } from "./Goals";
 import { PermanentNotes } from "./PermanentNotes";
 import { QuickNoteDialog } from "@/components/planner";
 
-export interface PermanentNote {
-  id: number;
-  title: string;
-  content: string;
-  created_at: string;
-  updated_at: string;
-  timestamp?: number;
+function setCookie(name: string, value: string, days: number) {
+  let expires = "";
+  if (days) {
+    const date = new Date();
+    date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000);
+    expires = "; expires=" + date.toUTCString();
+  }
+  document.cookie = name + "=" + (value || "") + expires + "; path=/";
 }
+
+function getCookie(name: string): string | null {
+  const nameEQ = name + "=";
+  const ca = document.cookie.split(";");
+  for (let i = 0; i < ca.length; i++) {
+    let c = ca[i];
+    while (c.charAt(0) == " ") c = c.substring(1, c.length);
+    if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+  }
+  return null;
+}
+
+const colorMap: Record<CalendarColor, string> = {
+  blue: "#3b82f6",
+  green: "#22c55e",
+  red: "#ef4444",
+  yellow: "#f59e0b",
+  purple: "#8b5cf6",
+  orange: "#f97316",
+  gray: "#64748b",
+};
 
 function formatKey(d: Date | string | number) {
   const date = new Date(d);
   return isNaN(date.getTime()) ? "" : date.toISOString().split("T")[0];
 }
+
+const DraggableTemplate: React.FC<{
+  template: EventTemplate;
+  onDelete: (template: EventTemplate) => void;
+  onEdit?: (template: EventTemplate) => void;
+}> = ({ template, onDelete, onEdit }) => {
+  const ref = React.useRef<HTMLDivElement | null>(null);
+  const [isDragging, setIsDragging] = React.useState(false);
+  const [isHovered, setIsHovered] = React.useState(false);
+
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    return draggable({
+      element: el,
+      getInitialData: () => ({ template }),
+      onDragStart: () => setIsDragging(true),
+      onDrop: () => setIsDragging(false),
+    });
+  }, [template]);
+
+  return (
+    <div
+      ref={ref}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className={`p-2 border rounded-md cursor-grab bg-card hover:bg-muted flex items-center justify-between gap-3 ${
+        isDragging ? "opacity-40" : ""
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <div
+          className="w-3 h-3 rounded-full"
+          style={{ backgroundColor: colorMap[template.color] }}
+        />
+        <span>{template.name}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`h-6 w-6 transition-opacity duration-200 ${
+            isHovered ? "opacity-100" : "opacity-0"
+          }`}
+          onClick={() => onEdit && onEdit(template)}
+          aria-label={`Edit template ${template.name}`}
+        >
+          <Edit3 className="h-4 w-4 text-foreground" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`h-6 w-6 transition-opacity duration-200 ${
+            isHovered ? "opacity-100" : "opacity-0"
+          }`}
+          onClick={() => onDelete(template)}
+          aria-label={`Delete template ${template.name}`}
+        >
+          <Trash2 className="h-4 w-4 text-destructive" />
+        </Button>
+      </div>
+    </div>
+  );
+};
 
 const Calendar: React.FC = () => {
   const { token, isAuthenticated, user, logout } = useAuth();
@@ -53,26 +175,116 @@ const Calendar: React.FC = () => {
   const [events, setEvents] = React.useState<CalendarEvent[]>(initialEvents);
   const [, setIsLoading] = React.useState(true);
   const [showSummary, setShowSummary] = React.useState(false);
-  const [showChecklist, setShowChecklist] = React.useState(false);
+  const [showChecklist, setShowChecklist] = React.useState<boolean>(() => {
+    const saved = getCookie("showChecklist");
+    return saved ? JSON.parse(saved) : false;
+  });
   const [showAll, setShowAll] = React.useState(false);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [activeSection, setActiveSection] = React.useState("calendar");
   const [isScrolled, setIsScrolled] = React.useState(false);
-  const [permanentNotes, setPermanentNotes] = React.useState<PermanentNote[]>([]);
+  const [permanentNotes, setPermanentNotes] = React.useState<PermanentNote[]>(
+    []
+  );
   const [notePopupOpen, setNotePopupOpen] = React.useState(false);
   const [quickNote, setQuickNote] = React.useState("");
   const [notePreviewMode, setNotePreviewMode] = React.useState(true);
-  const [pinnedItems, setPinnedItems] = React.useState<string[]>([]);
+  const [pinnedItems, setPinnedItems] = React.useState<string[]>(() => {
+    const saved = getCookie("pinnedItems");
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [isAddTemplateOpen, setIsAddTemplateOpen] = React.useState(false);
+  const [templates, setTemplates] = React.useState<EventTemplate[]>([]);
+  const [newTemplate, setNewTemplate] = React.useState<
+    Omit<EventTemplate, "id">
+  >({
+    name: "",
+    title: "",
+    color: "blue",
+  });
+  const [isEditTemplateOpen, setIsEditTemplateOpen] = React.useState(false);
+  const [editingTemplate, setEditingTemplate] = React.useState<EventTemplate | null>(null);
+  const [dailyGoals, setDailyGoals] = React.useState<DailyGoal[]>([]);
+  const [isGoalDialogOpen, setIsGoalDialogOpen] = React.useState(false);
+  const [editingGoal, setEditingGoal] = React.useState<DailyGoal | null>(null);
+
+  const alertAudioRef = React.useRef<HTMLAudioElement | null>(null);
+
+  React.useEffect(() => {
+    setCookie("showChecklist", JSON.stringify(showChecklist), 365);
+  }, [showChecklist]);
+
+  React.useEffect(() => {
+    setCookie("pinnedItems", JSON.stringify(pinnedItems), 365);
+  }, [pinnedItems]);
+
+  const handleSaveTemplate = async () => {
+    if (newTemplate.name.trim() && newTemplate.title.trim()) {
+      try {
+        const createdTemplate = await createEventTemplate(
+          newTemplate,
+          token || undefined
+        );
+        setTemplates((prev) => [...prev, createdTemplate]);
+        setNewTemplate({ name: "", title: "", color: "blue" });
+        setIsAddTemplateOpen(false);
+      } catch (error) {
+        console.error("Failed to save template:", error);
+      }
+    }
+  };
+
+  const handleDeleteTemplate = async (templateToDelete: EventTemplate) => {
+    try {
+      await deleteEventTemplate(templateToDelete.id, token || undefined);
+      setTemplates((prev) => prev.filter((t) => t.id !== templateToDelete.id));
+    } catch (error) {
+      console.error("Failed to delete template:", error);
+    }
+  };
+
+  const handleUpdateTemplate = async () => {
+    if (!editingTemplate) return;
+    try {
+      // call API
+      const updated = await updateEventTemplate(editingTemplate, token || undefined);
+      setTemplates((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      setEditingTemplate(null);
+      setIsEditTemplateOpen(false);
+    } catch (error) {
+      console.error('Failed to update template:', error);
+    }
+  };
+
+  const playAlertSound = async () => {
+    try {
+      const audio = new Audio(alertSound);
+      alertAudioRef.current = audio;
+      await audio.play();
+      console.log("Alert sound played successfully");
+    } catch (error) {
+      console.error("Error playing alert sound:", error);
+      alert("Event reminder!");
+    }
+  };
+
+  React.useEffect(() => {
+    return () => {
+      if (alertAudioRef.current) {
+        alertAudioRef.current.pause();
+        alertAudioRef.current = null;
+      }
+    };
+  }, []);
 
   const togglePin = (item: string) => {
-    setPinnedItems(prev => 
-      prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]
+    setPinnedItems((prev) =>
+      prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
     );
   };
 
-  // Handle scroll for shadow
   React.useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10);
@@ -81,7 +293,6 @@ const Calendar: React.FC = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Close mobile menu on resize
   React.useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth >= 1024) {
@@ -93,18 +304,47 @@ const Calendar: React.FC = () => {
   }, []);
 
   React.useEffect(() => {
-    try {
-      const savedNotes = localStorage.getItem('permanent-notes');
-      if (savedNotes) {
-        const notes = JSON.parse(savedNotes);
-        setPermanentNotes(notes);
+    const loadNotes = async () => {
+      if (isAuthenticated) {
+        try {
+          const notes = await fetchPermanentNotes(token || undefined);
+          setPermanentNotes(notes);
+        } catch (error) {
+          console.error("Failed to load permanent notes:", error);
+        }
       }
-    } catch (error) {
-      console.error('Error loading notes from localStorage:', error);
-    }
-  }, []);
+    };
+    loadNotes();
+  }, [isAuthenticated, token]);
 
-  // Calendar functionality
+  React.useEffect(() => {
+    const loadGoals = async () => {
+      if (isAuthenticated) {
+        try {
+          const goals = await fetchDailyGoals(token || undefined);
+          setDailyGoals(goals);
+        } catch (error) {
+          console.error("Failed to load daily goals:", error);
+        }
+      }
+    };
+    loadGoals();
+  }, [isAuthenticated, token]);
+
+  React.useEffect(() => {
+    const loadTemplates = async () => {
+      if (isAuthenticated) {
+        try {
+          const templates = await fetchEventTemplates(token || undefined);
+          setTemplates(templates);
+        } catch (error) {
+          console.error("Failed to load event templates:", error);
+        }
+      }
+    };
+    loadTemplates();
+  }, [isAuthenticated, token]);
+
   const saveAllAndRefresh = async () => {
     try {
       setIsRefreshing(true);
@@ -202,67 +442,70 @@ const Calendar: React.FC = () => {
     inputElement.click();
   };
 
-  const saveNoteLocally = React.useCallback(() => {
-    const noteKey = `note_${Date.now()}`;
-    const noteDate = formatKey(new Date());
-    
-    try {
-      const newNote = {
-        id: noteKey,
-        title: 'Permanent Note',
-        content: quickNote.trim(),
-        date: noteDate,
-        timestamp: Date.now()
-      };
-      
-      const existingNotes = JSON.parse(localStorage.getItem('permanent-notes') || '[]');
-      const updatedNotes = [newNote, ...existingNotes];
-      localStorage.setItem('permanent-notes', JSON.stringify(updatedNotes));
-      
-      setPermanentNotes(updatedNotes);
-    } catch (error) {
-      console.error('Error saving note to localStorage:', error);
-    }
-  }, [quickNote]);
-
   const handleSaveNote = React.useCallback(async () => {
     if (!quickNote.trim()) return;
-    
-    saveNoteLocally();
-    
-    setQuickNote("");
-    setNotePopupOpen(false);
-  }, [quickNote, saveNoteLocally]);
 
-  const applyFormatting = React.useCallback((prefix: string, suffix: string) => {
-    const textarea = document.getElementById('quick-note') as HTMLTextAreaElement;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selectedText = quickNote.substring(start, end);
-    let cursorPos = textarea.selectionStart;
-
-    if (selectedText) {
-      const newText = quickNote.substring(0, start) + prefix + selectedText + suffix + quickNote.substring(end);
-      setQuickNote(newText);
-    } else {
-      cursorPos = textarea.selectionStart;
-      const textBefore = quickNote.substring(0, cursorPos);
-      const textAfter = quickNote.substring(cursorPos);
-      setQuickNote(textBefore + prefix + suffix + textAfter);
+    try {
+      const newNote = await createPermanentNote(
+        {
+          title: "Permanent Note",
+          content: quickNote.trim(),
+        },
+        token ?? undefined
+      );
+      setPermanentNotes((prev) => [newNote, ...prev]);
+      setQuickNote("");
+      setNotePopupOpen(false);
+    } catch (error) {
+      console.error("Failed to save note:", error);
     }
-    
-    textarea.focus();
-    setTimeout(() => {
-      textarea.focus();
+  }, [quickNote, token]);
+
+  const applyFormatting = React.useCallback(
+    (prefix: string, suffix: string) => {
+      const textarea = document.getElementById(
+        "quick-note"
+      ) as HTMLTextAreaElement;
+      if (!textarea) return;
+
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const selectedText = quickNote.substring(start, end);
+      let cursorPos = textarea.selectionStart;
+
       if (selectedText) {
-        textarea.setSelectionRange(start, end + prefix.length + suffix.length);
+        const newText =
+          quickNote.substring(0, start) +
+          prefix +
+          selectedText +
+          suffix +
+          quickNote.substring(end);
+        setQuickNote(newText);
       } else {
-        textarea.setSelectionRange(cursorPos + prefix.length, cursorPos + prefix.length);
+        cursorPos = textarea.selectionStart;
+        const textBefore = quickNote.substring(0, cursorPos);
+        const textAfter = quickNote.substring(cursorPos);
+        setQuickNote(textBefore + prefix + suffix + textAfter);
       }
-    }, 0);
-  }, [quickNote]);
+
+      textarea.focus();
+      setTimeout(() => {
+        textarea.focus();
+        if (selectedText) {
+          textarea.setSelectionRange(
+            start,
+            end + prefix.length + suffix.length
+          );
+        } else {
+          textarea.setSelectionRange(
+            cursorPos + prefix.length,
+            cursorPos + prefix.length
+          );
+        }
+      }, 0);
+    },
+    [quickNote]
+  );
 
   const todayEvents = events.filter((event) =>
     isSameDay(parseISO(event.startDate), selectedDate)
@@ -344,28 +587,115 @@ const Calendar: React.FC = () => {
                   {pinnedItems.includes("goals") && (
                     <div className="border-t pt-4">
                       <div className="flex flex-row items-center justify-between pb-2">
-                        <h3 className="text-base font-medium">Daily Goals</h3>
-                        <Button variant="ghost" size="icon" onClick={() => togglePin("goals")}>
-                          <Pin className="h-2 w-4 fill-current" />
-                        </Button>
+                        <h3 className="text-base font-medium flex items-center gap-2">
+                          <Target className="h-4 w-4" />
+                          Daily Goals
+                        </h3>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-8 w-8 bg-white"
+                            onClick={() => setIsGoalDialogOpen(true)}
+                          >
+                            <Plus className="h-4 w-4 text-black" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => togglePin("goals")}
+                          >
+                            <Pin className="h-2 w-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <Goals />
+                      <Goals
+                        goals={dailyGoals}
+                        setGoals={setDailyGoals}
+                        token={token}
+                        isGoalDialogOpen={isGoalDialogOpen}
+                        setIsGoalDialogOpen={setIsGoalDialogOpen}
+                        editingGoal={editingGoal}
+                        setEditingGoal={setEditingGoal}
+                      />
                     </div>
                   )}
                   {pinnedItems.includes("notes") && (
                     <div className="border-t pt-4">
                       <div className="flex flex-row items-center justify-between pb-2">
-                        <h3 className="text-base font-medium">Permanent Notes</h3>
-                        <Button variant="ghost" size="icon" onClick={() => togglePin("notes")}>
-                          <Pin className="h-4 w-4 fill-current" />
-                        </Button>
+                        <h3 className="text-base font-medium flex items-center gap-2">
+                          <Notebook className="h-4 w-4" />
+                          Permanent Notes
+                        </h3>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-8 w-8 bg-white"
+                            onClick={() => setNotePopupOpen(true)}
+                          >
+                            <Plus className="h-4 w-4 text-black" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => togglePin("notes")}
+                          >
+                            <Pin className="h-4 w-4 fill-current" />
+                          </Button>
+                        </div>
                       </div>
                       <PermanentNotes
                         permanentNotes={permanentNotes}
+                        setPermanentNotes={setPermanentNotes}
                         setQuickNote={setQuickNote}
                         setNotePreviewMode={setNotePreviewMode}
                         setNotePopupOpen={setNotePopupOpen}
+                        token={token}
                       />
+                    </div>
+                  )}
+                  {pinnedItems.includes("templates") && (
+                    <div className="border-t pt-4">
+                      <div className="flex flex-row items-center justify-between pb-2">
+                        <h3 className="text-base font-medium flex items-center gap-2">
+                          <LayoutTemplate className="h-4 w-4" />
+                          Event Templates
+                        </h3>
+                        <div className="flex items-center">
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-8 w-8 bg-white"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsAddTemplateOpen(true);
+                            }}
+                          >
+                            <Plus className="h-4 w-4 text-black" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => togglePin("templates")}
+                          >
+                            <Pin className="h-4 w-4 fill-current" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="space-y-2 pt-2">
+                        {templates.map((template, index) => (
+                          <DraggableTemplate
+                            key={index}
+                            template={template}
+                            onDelete={handleDeleteTemplate}
+                            onEdit={(t) => {
+                              setEditingTemplate(t);
+                              setIsEditTemplateOpen(true);
+                            }}
+                          />
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -377,14 +707,46 @@ const Calendar: React.FC = () => {
                       <AccordionItem value="item-2">
                         <div className="flex justify-between w-full items-center pr-2">
                           <AccordionTrigger className="flex-1 text-left">
+                            <div className="flex items-center gap-2">
+                              <Target className="h-4 w-4" />
                               <span>Daily Goals</span>
+                            </div>
                           </AccordionTrigger>
-                          <Button variant="ghost" size="icon" className="h-4 w-8" onClick={(e) => { e.stopPropagation(); togglePin("goals"); }}>
-                                <Pin className="h-2 w-4" />
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              className="h-8 w-8 bg-white"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsGoalDialogOpen(true);
+                                setEditingGoal(null);
+                              }}
+                            >
+                              <Plus className="h-4 w-4 text-black" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                togglePin("goals");
+                              }}
+                            >
+                              <Pin className="h-2 w-4" />
+                            </Button>
+                          </div>
                         </div>
                         <AccordionContent>
-                          <Goals />
+                          <Goals
+                            goals={dailyGoals}
+                            setGoals={setDailyGoals}
+                            token={token}
+                            isGoalDialogOpen={isGoalDialogOpen}
+                            setIsGoalDialogOpen={setIsGoalDialogOpen}
+                            editingGoal={editingGoal}
+                            setEditingGoal={setEditingGoal}
+                          />
                         </AccordionContent>
                       </AccordionItem>
                     )}
@@ -392,19 +754,92 @@ const Calendar: React.FC = () => {
                       <AccordionItem value="item-3">
                         <div className="flex justify-between w-full items-center pr-2">
                           <AccordionTrigger className="flex-1 text-left">
-                            <span>Permanent Notes</span>
+                            <div className="flex items-center gap-2">
+                              <Notebook className="h-4 w-4" />
+                              <span>Permanent Notes</span>
+                            </div>
                           </AccordionTrigger>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); togglePin("notes"); }}>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              className="h-8 w-8 bg-white"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setNotePopupOpen(true);
+                              }}
+                            >
+                              <Plus className="h-4 w-4 text-black" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                togglePin("notes");
+                              }}
+                            >
                               <Pin className="h-4 w-4" />
-                          </Button>
+                            </Button>
+                          </div>
                         </div>
                         <AccordionContent>
                           <PermanentNotes
                             permanentNotes={permanentNotes}
+                            setPermanentNotes={setPermanentNotes}
                             setQuickNote={setQuickNote}
                             setNotePreviewMode={setNotePreviewMode}
                             setNotePopupOpen={setNotePopupOpen}
+                            token={token}
                           />
+                        </AccordionContent>
+                      </AccordionItem>
+                    )}
+                    {!pinnedItems.includes("templates") && (
+                      <AccordionItem value="templates">
+                        <div className="flex justify-between w-full items-center pr-2">
+                          <AccordionTrigger className="flex-1 text-left">
+                            <div className="flex items-center gap-2">
+                              <LayoutTemplate className="h-4 w-4" />
+                              <span>Event Templates</span>
+                            </div>
+                          </AccordionTrigger>
+                          <div className="flex items-center">
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              className="h-8 w-8 bg-white"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsAddTemplateOpen(true);
+                              }}
+                            >
+                              <Plus className="h-4 w-4 text-black" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                togglePin("templates");
+                              }}
+                            >
+                              <Pin className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        <AccordionContent>
+                          <div className="space-y-2 pt-2">
+                            {templates.map((template, index) => (
+                              <DraggableTemplate
+                                key={index}
+                                template={template}
+                                onDelete={handleDeleteTemplate}
+                              />
+                            ))}
+                          </div>
                         </AccordionContent>
                       </AccordionItem>
                     )}
@@ -416,9 +851,134 @@ const Calendar: React.FC = () => {
         </div>
       </div>
 
+      {/* Add Template Dialog */}
+      <Dialog open={isAddTemplateOpen} onOpenChange={setIsAddTemplateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Event Template</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="template-name" className="text-sm font-medium">
+                Template Name
+              </label>
+              <Input
+                id="template-name"
+                value={newTemplate.name}
+                onChange={(e) =>
+                  setNewTemplate((prev) => ({ ...prev, name: e.target.value }))
+                }
+                placeholder="e.g., Morning Routine"
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="template-title" className="text-sm font-medium">
+                Default Event Title
+              </label>
+              <Input
+                id="template-title"
+                value={newTemplate.title}
+                onChange={(e) =>
+                  setNewTemplate((prev) => ({ ...prev, title: e.target.value }))
+                }
+                placeholder="e.g., Morning Standup"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Default Color</label>
+              <div className="flex gap-2 pt-2">
+                {(Object.keys(colorMap) as CalendarColor[]).map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    className={`w-7 h-7 rounded-full border-2 transition-all duration-150 ${
+                      newTemplate.color === color
+                        ? "border-primary ring-2 ring-primary/50"
+                        : "border-transparent"
+                    }`}
+                    style={{ backgroundColor: colorMap[color] }}
+                    onClick={() =>
+                      setNewTemplate((prev) => ({ ...prev, color }))
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsAddTemplateOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleSaveTemplate}>Save Template</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Template Dialog */}
+      <Dialog open={isEditTemplateOpen} onOpenChange={setIsEditTemplateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Event Template</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="edit-template-name" className="text-sm font-medium">
+                Template Name
+              </label>
+              <Input
+                id="edit-template-name"
+                value={editingTemplate?.name || ""}
+                onChange={(e) =>
+                  setEditingTemplate((prev) => (prev ? { ...prev, name: e.target.value } : prev))
+                }
+                placeholder="Template name"
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="edit-template-title" className="text-sm font-medium">
+                Default Event Title
+              </label>
+              <Input
+                id="edit-template-title"
+                value={editingTemplate?.title || ""}
+                onChange={(e) =>
+                  setEditingTemplate((prev) => (prev ? { ...prev, title: e.target.value } : prev))
+                }
+                placeholder="Default event title"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Default Color</label>
+              <div className="flex gap-2 pt-2">
+                {(Object.keys(colorMap) as CalendarColor[]).map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    className={`w-7 h-7 rounded-full border-2 transition-all duration-150 ${
+                      editingTemplate?.color === color ? "border-primary ring-2 ring-primary/50" : "border-transparent"
+                    }`}
+                    style={{ backgroundColor: colorMap[color] }}
+                    onClick={() => setEditingTemplate((prev) => (prev ? { ...prev, color } : prev))}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditTemplateOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateTemplate}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Summary Dialog */}
       <Dialog open={showSummary} onOpenChange={setShowSummary}>
-        <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto rounded-2xl border border-border shadow-2xl bg-card p-0">
+        <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto rounded-2xl border border-border shadow-2xl bg-[var(--calendar-date-bg)] p-0">
           <DialogHeader className="p-6 pb-4 border-b border-border">
             <DialogTitle className="flex items-center gap-3 text-2xl font-bold text-foreground">
               <div className="p-2 bg-muted rounded-lg">
@@ -430,7 +990,7 @@ const Calendar: React.FC = () => {
           <div className="p-6 space-y-6">
             {/* Summary Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <Card className="border border-border bg-[var(--calendar-date-bg)]">
+                <Card className="border border-border bg-[var(--calendar-date-bg)]">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-muted rounded-lg">
@@ -447,7 +1007,7 @@ const Calendar: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
-              <Card className="border border-border bg-[var(--calendar-date-bg)]">
+                <Card className="border border-border bg-[var(--calendar-date-bg)]">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-muted rounded-lg">
@@ -464,7 +1024,7 @@ const Calendar: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
-              <Card className="border border-border">
+                <Card className="border border-border bg-[var(--calendar-date-bg)]">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-muted rounded-lg">
@@ -481,7 +1041,7 @@ const Calendar: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
-              <Card className="border border-border">
+                <Card className="border border-border bg-[var(--calendar-date-bg)]">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-muted rounded-lg">
@@ -538,7 +1098,7 @@ const Calendar: React.FC = () => {
                 {(showAll ? events : events.slice(0, 5)).map((event) => (
                   <div
                     key={event.id}
-                    className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
+                    className="flex items-center gap-3 p-3 rounded-lg border border-border bg-[var(--calendar-date-bg)] hover:bg-muted/50 transition-colors"
                   >
                     <div
                       className="w-3 h-3 rounded-full flex-shrink-0"
@@ -559,6 +1119,15 @@ const Calendar: React.FC = () => {
                         </p>
                       </div>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={playAlertSound}
+                      aria-label={`Set alert for event ${event.title}`}
+                    >
+                      <Bell className="w-4 h-4 text-muted-foreground" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"

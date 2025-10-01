@@ -5,6 +5,7 @@ interface User {
   email: string;
   name?: string;
   username: string;
+  profile_picture?: string;
   is_admin?: boolean;
   is_v2ray_admin?: boolean;
   has_v2ray_access?: boolean;
@@ -19,6 +20,7 @@ interface AuthContextType {
   hasV2RayAccess: boolean;
   login: (userData: User, token: string) => void;
   logout: () => void;
+  updateUser: (userData: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -55,8 +57,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [hasV2RayAccess, setHasV2RayAccess] = useState<boolean>(false);
 
   useEffect(() => {
-    const storedToken = getCookie('authToken') || localStorage.getItem('authToken');
+    let storedToken = getCookie('authToken') || localStorage.getItem('authToken');
     const storedUser = getCookie('user') || localStorage.getItem('user');
+    
+    if (storedToken) {
+      // Ensure token has proper format
+      storedToken = storedToken.startsWith('Token ') ? storedToken : `Token ${storedToken}`;
+    }
     
     if (storedToken && storedUser) {
       try {
@@ -79,17 +86,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = (userData: User, authToken: string) => {
+    const token = authToken.startsWith('Token ') ? authToken : `Token ${authToken}`;
+    console.debug('Setting auth token:', token);
+    
     setUser(userData);
-    setToken(authToken);
+    setToken(token);
     setIsAuthenticated(true);
     const isAdminUser = userData.is_admin === true;
     setIsAdmin(isAdminUser);
     setIsV2RayAdmin(isAdminUser || userData.is_v2ray_admin === true);
     setHasV2RayAccess(userData.has_v2ray_access === true);
     
-    setCookie('authToken', authToken, 7);
+    setCookie('authToken', token, 7);
     setCookie('user', JSON.stringify(userData), 7);
-    localStorage.setItem('authToken', authToken);
+    localStorage.setItem('authToken', token);
     localStorage.setItem('user', JSON.stringify(userData));
   };
 
@@ -107,8 +117,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem('user');
   };
 
+  const updateUser = (userData: User) => {
+    setUser(userData);
+    setCookie('user', JSON.stringify(userData), 7);
+    localStorage.setItem('user', JSON.stringify(userData));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, isAuthenticated, isAdmin, isV2RayAdmin, hasV2RayAccess, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isAuthenticated, isAdmin, isV2RayAdmin, hasV2RayAccess, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

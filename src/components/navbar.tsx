@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, Calendar, User, Wifi } from "lucide-react";
+import { Home, Calendar, User, Wifi, ListTodo } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import type { ComponentType } from "react";
@@ -18,7 +18,7 @@ export default function Navbar() {
 
   const baseNavItems: NavItem[] = [
     { path: "/home", icon: Home },
-    { path: "/planner", icon: Calendar },
+    { path: "/planner", icon: ListTodo },
     { path: "/calendar", icon: Calendar },
     { path: "/auth", icon: User, label: isAuthenticated ? (user?.username?.substring(0, 3) || user?.name?.substring(0, 3) || "...") : undefined }
   ];

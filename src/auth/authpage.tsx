@@ -11,7 +11,7 @@ interface FormData {
   username?: string;
 }
  
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+import { API_BASE_URL } from "@/config/backend";
 
 export default function AuthPage() {
   const [isSignIn, setIsSignIn] = useState(true);
@@ -40,12 +40,15 @@ export default function AuthPage() {
     setError(null);
 
     try {
-      const token = localStorage.getItem("authToken");
+      let token = localStorage.getItem("authToken");
+      if (token && !token.startsWith('Token ')) {
+        token = `Token ${token}`;
+      }
       const response = await fetch(`${API_BASE_URL}/auth/update-profile/`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Token ${token}`,
+          "Authorization": token || '',
         },
         body: JSON.stringify({ name: newName }),
       });
@@ -205,20 +208,24 @@ export default function AuthPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || "Authentication failed");
+        throw new Error(data.message || data.error || "Authentication failed");
       }
 
-      if (data.status !== 'success') {
-        throw new Error(data.message || "Authentication failed");
+      // Check if we have the required data, regardless of status field
+      if (!data.token || !data.user) {
+        throw new Error("Invalid response from server");
       }
 
-      localStorage.setItem("authToken", data.token);
+      const token = data.token.startsWith('Token ') ? data.token : `Token ${data.token}`;
+      console.debug('Storing auth token:', token);
+      
+      localStorage.setItem("authToken", token);
       localStorage.setItem("user", JSON.stringify(data.user));
       
-      document.cookie = `authToken=${data.token}; path=/; max-age=604800`;
-      document.cookie = `user=${JSON.stringify(data.user)}; path=/; max-age=604800`;
+      document.cookie = `authToken=${token}; path=/; max-age=604800; SameSite=Lax`;
+      document.cookie = `user=${JSON.stringify(data.user)}; path=/; max-age=604800; SameSite=Lax`;
       
-      login(data.user, data.token);
+      login(data.user, token);
       
       navigate("/planner");
     } catch (err: any) {

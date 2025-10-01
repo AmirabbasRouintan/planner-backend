@@ -5,14 +5,14 @@
 export function getBackendUrl(): string {
   // In development, use the environment variable or fallback to localhost
   if (import.meta.env.DEV) {
-    return import.meta.env.VITE_BACKEND_URL || 'http://ixiflower32.pythonanywhere.com';
+    return import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
   }
   
   // In production, use the current host as the backend
   return window.location.origin;
 }
 
-// Get API base URL (includes /tickets/api suffix)
+// Get API base URL
 export const getApiBaseUrl = (): string => {
   const backendUrl = getBackendUrl();
   return `${backendUrl}/tickets/api`;

@@ -1,7 +1,9 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from .models import Ticket, ConfigFile, V2RayConfig, UserProfile, Task, PermanentNote
+
+User = get_user_model()
 
 @admin.register(Ticket)
 class TicketAdmin(admin.ModelAdmin):
@@ -66,6 +68,5 @@ class PermanentNoteAdmin(admin.ModelAdmin):
     get_v2ray_access_status.short_description = 'V2Ray Access'
     get_v2ray_access_status.boolean = True
 
-# Unregister the original User admin and register the custom one
-admin.site.unregister(User)
+# Register the custom User admin
 admin.site.register(User, CustomUserAdmin)

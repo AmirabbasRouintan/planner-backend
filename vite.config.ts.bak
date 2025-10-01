@@ -1,0 +1,94 @@
+import path from "path"
+import tailwindcss from "@tailwindcss/vite"
+import       },
+      historyApiFallback: true // Enable client-side routing
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vendor: ['react', 'react-dom', 'react-router-dom'],
+          },
+        },
+      },
+    }
+  };
+});t from "@vitejs/plugin-react"
+import { defineConfig } from "vite"
+
+// https://vite.dev/config/
+export default defineConfig(async () => {
+  // Import the backend config using dynamic import to avoid TypeScript issues
+  // @ts-expect-error - backend.config.cjs is a CommonJS module without type declarations
+  const backendConfig: { getBackendUrl: () => string } = await import("./backend.config.cjs");
+  const backendUrl = backendConfig.getBackendUrl();
+  
+  const cspDirectives = {
+    "default-src": ["'self'"],
+    "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+    "connect-src": ["'self'", "localhost:*", "ws://localhost:*"],
+    "style-src": ["'self'", "'unsafe-inline'"],
+    "img-src": ["'self'", "data:", "blob:"],
+    "font-src": ["'self'"],
+    "object-src": ["'none'"],
+    "base-uri": ["'self'"]
+  };
+
+  return {
+    plugins: [react(), tailwindcss()],
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./src"),
+      },
+    },
+    server: {
+      host: '0.0.0.0',
+      proxy: {
+        '/api': {
+          target: backendUrl,
+          changeOrigin: true,
+          rewrite: (path: string) => path.replace(/^\/api/, '/tickets/api')
+        },
+        '/download': {
+          target: backendUrl,
+          changeOrigin: true,
+          rewrite: (path: string) => path.replace(/^\/download/, '/tickets/api/download')
+        }
+      },
+      cors: true,
+      middlewares: [
+        (req: any, res: any, next: () => void) => {
+          const cspString = Object.entries(cspDirectives)
+            .map(([key, values]) => `${key} ${values.join(' ')}`)
+            .join('; ');
+
+          res.setHeader('Content-Security-Policy', cspString);
+          next();
+        }
+      ],
+      middleware: [
+        (_req: any, res: { setHeader: (name: string, value: string) => void }, next: () => void) => {
+          // Add CSP headers
+          res.setHeader(
+            'Content-Security-Policy',
+            "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' http://localhost:* ws://localhost:*; style-src 'self' 'unsafe-inline';"
+          );
+          next();
+        }
+      ],
+      fs: {
+        strict: false,
+      }
+    },
+    // Add historyApiFallback for client-side routing
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vendor: ['react', 'react-dom', 'react-router-dom'],
+          },
+        },
+      },
+    }
+  };
+});
