@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-uer+0@+y3abl7%lot3lqmr$=5e13saz1xtok0ghlt@(tp-it&=
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['185.92.181.112', '127.0.0.1', 'localhost', '*', "http://192.168.1.100:5173", ".vercel.app","ixiflower32.pythonanywhere.com", "https://planner-peach-ten.vercel.app"]
+ALLOWED_HOSTS = ['185.92.181.112', '127.0.0.1', 'localhost', '*', "http://192.168.1.100:5173", ".vercel.app","209.38.203.71:5001", "https://planner-peach-ten.vercel.app"]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
