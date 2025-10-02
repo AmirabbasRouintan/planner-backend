@@ -140,7 +140,6 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
   const [isTelegramDialogOpen, setIsTelegramDialogOpen] = React.useState(false);
   const [telegramUsername, setTelegramUsername] = React.useState("");
 
-  // Navigation items
   const navItems = [
     { id: "calendar", label: "Calendar", icon: CalendarIcon },
     { id: "tasks", label: "Tasks", icon: CheckSquare },
@@ -148,7 +147,6 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
     { id: "notifications", label: "Notifications", icon: Bell }
   ];
 
-  // Get user initials for avatar
   const getUserInitials = () => {
     if (!user?.name) return "U";
     return user.name
@@ -159,10 +157,9 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
       .slice(0, 2);
   };
 
-  // Function to get profile image URL
   const getProfileImageUrl = () => {
     if (user?.profile_picture) {
-      const baseUrl = import.meta.env.VITE_BACKEND_URL || 'http://ixiflower32.pythonanywhere.com/';
+      const baseUrl = import.meta.env.VITE_BACKEND_URL || 'https://ixiflower32.pythonanywhere.com';
       const path = user.profile_picture.replace(/^\/+/, '');
       return `${baseUrl}/${path}`;
     }
@@ -243,9 +240,7 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
           }`}
         >
           <div className="container mx-auto px-4 sm:px-6 py-3">
-            {/* Mobile Layout */}
             <div className="flex items-center justify-between md:hidden">
-              {/* Left: Menu */}
               <Sheet open={leftOpen} onOpenChange={setLeftOpen}>
                 <SheetTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-9 w-9">
@@ -383,7 +378,6 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
                 </SheetContent>
               </Sheet>
 
-              {/* Center: Date for mobile */}
               <div className="flex flex-col items-center flex-1 mx-4">
                 <div className="flex items-center gap-2 mb-1">
                   <h1 className="text-lg font-bold text-foreground">
@@ -503,7 +497,6 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
                 </Popover>
               </div>
 
-              {/* Right: Profile menu for mobile */}
               <Sheet open={rightOpen} onOpenChange={setRightOpen}>
                 <SheetTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-9 w-9">
@@ -562,9 +555,7 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
               </Sheet>
             </div>
 
-            {/* Desktop Layout */}
             <div className="hidden md:flex items-center justify-between">
-              {/* Left: Navigation and basic actions */}
               <div className="flex items-center gap-4 flex-1">
                 <nav className="flex items-center gap-1">
                   {navItems.map((item) => {
@@ -609,7 +600,6 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
                 </div>
               </div>
 
-              {/* Center: Date and navigation - Properly centered */}
               <div className="flex flex-col items-center mx-8 flex-shrink-0">
                 <div className="flex items-center gap-4 mb-2">
 
@@ -754,9 +744,7 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
                 </Popover>
               </div>
 
-              {/* Right: Stats, actions, and profile */}
               <div className="flex items-center gap-3 flex-1 justify-end">
-                {/* Stats - Hidden on small desktop, shown on large */}
                 <div className="hidden lg:flex items-center gap-3">
                   <Badge variant="secondary" className="h-7 px-3 text-xs">
                     <BarChart3 className="mr-1 h-3 w-3" />
@@ -772,7 +760,6 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
 
                 <Separator orientation="vertical" className="h-6" />
 
-                {/* Actions */}
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
@@ -828,7 +815,6 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
 
                 <Separator orientation="vertical" className="h-6" />
 
-                {/* Profile */}
                 <ProfileDropdown />
               </div>
             </div>
@@ -882,7 +868,6 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
             <Button
               type="submit"
               onClick={() => {
-                // Here you would typically save the username
                 console.log("Telegram username to save:", telegramUsername);
                 setIsTelegramDialogOpen(false);
               }}

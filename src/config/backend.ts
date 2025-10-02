@@ -5,7 +5,7 @@
 export function getBackendUrl(): string {
   // In development, use the environment variable or fallback to localhost
   if (import.meta.env.DEV) {
-    return import.meta.env.VITE_BACKEND_URL || 'http://ixiflower32.pythonanywhere.com/';
+    return import.meta.env.VITE_BACKEND_URL || 'https://ixiflower32.pythonanywhere.com';
   }
   
   // In production, use the current host as the backend
