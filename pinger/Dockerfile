@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.11-alpine AS builder
 
 # Set environment variables to reduce memory usage
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -8,17 +8,37 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 
 WORKDIR /app
 
-# Install system dependencies required for psycopg2
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        build-essential \
-        libpq-dev \
-        postgresql-client \
-    && rm -rf /var/lib/apt/lists/*
+# Install build dependencies and psycopg2 dependencies
+RUN apk add --no-cache \
+    gcc \
+    musl-dev \
+    libffi-dev \
+    postgresql-dev \
+    postgresql-client
 
-# Copy requirements and install Python dependencies with optimizations
+# Copy requirements and install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir --compile -r requirements.txt
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# Production stage
+FROM python:3.11-alpine
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apk add --no-cache postgresql-client
+
+# Copy installed packages from builder stage
+COPY --from=builder /root/.local /root/.local
+
+# Make sure scripts in .local are usable
+ENV PATH=/root/.local/bin:$PATH
 
 # Copy project
 COPY . .
@@ -26,5 +46,5 @@ COPY . .
 # Expose port
 EXPOSE 8000
 
-# Use gunicorn for production or runserver for development
+# Use runserver for development
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
