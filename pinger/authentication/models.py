@@ -13,6 +13,6 @@ class User(AbstractUser):
         if self.profile_picture:
             # Return complete absolute URL
             if settings.DEBUG:
-                return f'http://209.38.203.71:5001{self.profile_picture.url}'
+                return f'http://localhost:8000{self.profile_picture.url}'
             return self.profile_picture.url
         return None

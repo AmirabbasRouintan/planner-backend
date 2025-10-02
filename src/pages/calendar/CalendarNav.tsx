@@ -162,7 +162,7 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
   // Function to get profile image URL
   const getProfileImageUrl = () => {
     if (user?.profile_picture) {
-      const baseUrl = import.meta.env.VITE_BACKEND_URL || 'http://209.38.203.71:5001';
+      const baseUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
       const path = user.profile_picture.replace(/^\/+/, '');
       return `${baseUrl}/${path}`;
     }

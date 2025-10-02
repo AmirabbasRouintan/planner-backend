@@ -26,9 +26,10 @@ SECRET_KEY = 'django-insecure-uer+0@+y3abl7%lot3lqmr$=5e13saz1xtok0ghlt@(tp-it&=
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['185.92.181.112', '127.0.0.1', 'localhost', '*', "http://192.168.1.100:5173", ".vercel.app","209.38.203.71:5001", "https://planner-peach-ten.vercel.app"]
+ALLOWED_HOSTS = ['185.92.181.112', '127.0.0.1', 'localhost', '*', "http://192.168.1.100:5173", ".vercel.app","209.38.203.71:8000", "https://planner-peach-ten.vercel.app", "0.0.0.0", "backend"]
 
 INSTALLED_APPS = [
+    'corsheaders',  # Adding CORS headers support
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -36,7 +37,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'tickets',  # Adding our tickets app
-    'corsheaders',  # Adding CORS headers support
     'authentication',  # Adding authentication app
 ]
 
@@ -44,8 +44,8 @@ INSTALLED_APPS = [
 AUTH_USER_MODEL = 'authentication.User'
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',  # Must be placed as high as possible
+    'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -77,12 +77,24 @@ WSGI_APPLICATION = 'ixiflowerv2ray.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# Default to SQLite for local development
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# If running in Docker or with specific environment variables, use PostgreSQL
+if os.environ.get('DB_HOST'):
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('DB_NAME', 'planner_db'),
+        'USER': os.environ.get('DB_USER', 'planner_user'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', 'planner_password'),
+        'HOST': os.environ.get('DB_HOST', 'db'),
+        'PORT': os.environ.get('DB_PORT', '5432'),
+    }
 
 
 # Authentication backends
@@ -136,46 +148,12 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# CORS settings
+# Allow CORS for frontend development
 CORS_ALLOWED_ORIGINS = [
-    "http://87.120.219.252:3000",
-    "http://192.168.100.65:5173",  # Vite's default development server
+    "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "http://192.168.100.65:3000",   # React default port
-    "http://127.0.0.1:3000",
-    "http://185.92.181.112:8000",  # Add your frontend domain
-    "https://planner-peach-ten.vercel.app"
 ]
 
-# Allow all origins (for development only - restrict in production)
-CORS_ALLOW_ALL_ORIGINS = True
-
-# Allow credentials to be included in CORS requests
 CORS_ALLOW_CREDENTIALS = True
 
-# Allow all headers and methods
-CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
-]
-
-CORS_ALLOW_METHODS = [
-    'DELETE',
-    'GET',
-    'OPTIONS',
-    'PATCH',
-    'POST',
-    'PUT',
-]
-
-# Remove the problematic CORS_ORIGIN_WHITELIST setting
-# CORS_ORIGIN_WHITELIST = [
-#     "*"
-# ]
+CORS_ALLOW_ALL_ORIGINS = True  # Only for development

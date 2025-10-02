@@ -1,0 +1,11 @@
+*.pyc
+__pycache__
+db.sqlite3
+db.sqlite3.*
+media/
+*.log
+.env
+.env.local
+.DS_Store
+migrations/*.py
+!migrations/__init__.py

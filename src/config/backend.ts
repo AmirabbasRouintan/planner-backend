@@ -5,7 +5,7 @@
 export function getBackendUrl(): string {
   // In development, use the environment variable or fallback to localhost
   if (import.meta.env.DEV) {
-    return import.meta.env.VITE_BACKEND_URL || 'http://209.38.203.71:5001';
+    return import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
   }
   
   // In production, use the current host as the backend
