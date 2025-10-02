@@ -55,6 +55,114 @@ def api_login(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+@csrf_exempt
+def api_register(request):
+    """API endpoint for user registration"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        username = data.get('username')
+        email = data.get('email')
+        password = data.get('password')
+        
+        if not username or not email or not password:
+            return JsonResponse({'error': 'Username, email, and password are required'}, status=400)
+        
+        # Check if user already exists
+        if User.objects.filter(username=username).exists():
+            return JsonResponse({'error': 'Username already exists'}, status=400)
+        
+        if User.objects.filter(email=email).exists():
+            return JsonResponse({'error': 'Email already exists'}, status=400)
+        
+        # Create user
+        user = User.objects.create_user(username=username, email=email, password=password)
+        
+        # Create token for the user
+        token = Token.objects.create(user=user)
+        
+        return JsonResponse({
+            'success': True,
+            'token': token.key,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'is_staff': user.is_staff
+            }
+        }, status=201)
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+def api_update_profile(request):
+    """API endpoint for updating user profile"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    # Check if user is authenticated either via session or token
+    user = None
+    if request.user.is_authenticated:
+        user = request.user
+    else:
+        # Check for token authentication
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if auth_header.startswith('Token '):
+            token_key = auth_header.split(' ')[1]
+            # Validate token and get user
+            try:
+                token = Token.objects.get(key=token_key)
+                user = token.user
+            except Token.DoesNotExist:
+                pass
+    
+    if not user:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    try:
+        data = json.loads(request.body)
+        
+        # Handle username update
+        if 'username' in data:
+            if User.objects.exclude(pk=user.pk).filter(username=data['username']).exists():
+                return JsonResponse({'error': 'Username already taken'}, status=400)
+            user.username = data['username']
+        
+        # Handle email update
+        if 'email' in data:
+            if User.objects.exclude(pk=user.pk).filter(email=data['email']).exists():
+                return JsonResponse({'error': 'Email already taken'}, status=400)
+            user.email = data['email']
+            
+        # Handle password change
+        if all(key in data for key in ['current_password', 'new_password']):
+            if not user.check_password(data['current_password']):
+                return JsonResponse({'error': 'Current password is incorrect'}, status=400)
+            user.set_password(data['new_password'])
+        
+        user.save()
+        
+        return JsonResponse({
+            'success': True,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'is_staff': user.is_staff
+            }
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
 def add_cors_headers(view_func):
     """Decorator to add CORS headers to API responses"""
     def wrapper(request, *args, **kwargs):
