@@ -18,6 +18,43 @@ from datetime import datetime
 from .models import Ticket, ConfigFile, V2RayConfig, UserProfile, PermanentNote, Task, Token, ChecklistItem, DailyGoal, EventTemplate
 
 
+@csrf_exempt
+def api_login(request):
+    """API endpoint for user login"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        username = data.get('username')
+        password = data.get('password')
+        
+        if not username or not password:
+            return JsonResponse({'error': 'Username and password are required'}, status=400)
+        
+        user = authenticate(request, username=username, password=password)
+        if user is not None:
+            login(request, user)
+            # Create or get token for the user
+            token, created = Token.objects.get_or_create(user=user)
+            return JsonResponse({
+                'success': True,
+                'token': token.key,
+                'user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'is_staff': user.is_staff
+                }
+            })
+        else:
+            return JsonResponse({'error': 'Invalid credentials'}, status=401)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
 def add_cors_headers(view_func):
     """Decorator to add CORS headers to API responses"""
     def wrapper(request, *args, **kwargs):
@@ -497,85 +534,6 @@ def api_list_files(request):
             return JsonResponse({
                 'status': 'error',
                 'message': str(e)
-            }, status=500)
-    
-    return JsonResponse({
-        'status': 'error',
-        'message': 'Invalid request method'
-    }, status=405)
-
-@csrf_exempt
-@add_cors_headers
-def api_login(request):
-    """
-    API endpoint for user login
-    """
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            email = data.get('email')
-            password = data.get('password')
-            
-            if not email or not password:
-                return JsonResponse({
-                    'status': 'error',
-                    'message': 'Email and password are required'
-                }, status=400)
-            
-            # Authenticate user directly with email (using our custom EmailBackend)
-            user = authenticate(request, username=email, password=password)
-            
-            if user is not None:
-                login(request, user)
-                
-                # Get or create auth token for the user
-                token, created = Token.objects.get_or_create(user=user)
-                
-                # Check if user has a profile
-                profile = getattr(user, 'profile', None)
-                is_v2ray_admin = False
-                has_v2ray_access = True  # Default value
-                
-                if profile:
-                    is_v2ray_admin = profile.is_v2ray_admin
-                    has_v2ray_access = profile.has_v2ray_access
-                else:
-                    # Create profile if it doesn't exist
-                    from .models import UserProfile
-                    profile = UserProfile.objects.create(user=user)
-                
-                # Return user data and token
-                return JsonResponse({
-                    'status': 'success',
-                    'token': token.key,
-                    'user': {
-                        'id': str(user.id),
-                        'username': user.username,
-                        'email': user.email,
-                        'name': user.first_name + ' ' + user.last_name if user.first_name or user.last_name else '',
-                        'is_admin': user.is_staff,
-                        'is_v2ray_admin': is_v2ray_admin,
-                        'has_v2ray_access': has_v2ray_access
-                    }
-                })
-            else:
-                return JsonResponse({
-                    'status': 'error',
-                    'message': 'Invalid email or password'
-                }, status=401)
-                
-        except json.JSONDecodeError:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'Invalid JSON data'
-            }, status=400)
-        except Exception as e:
-            import traceback
-            print('Login error:', str(e))
-            print('Traceback:', traceback.format_exc())
-            return JsonResponse({
-                'status': 'error',
-                'message': 'An unexpected error occurred. Please try again later.'
             }, status=500)
     
     return JsonResponse({
