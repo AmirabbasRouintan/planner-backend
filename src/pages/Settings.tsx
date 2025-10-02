@@ -19,7 +19,7 @@ const Settings: React.FC = () => {
     if (!path) return null;
     if (path.startsWith('http')) return path;
     
-    const baseUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+    const baseUrl = import.meta.env.VITE_BACKEND_URL || 'http://209.38.203.71:8000';
     // Remove any leading slashes from the path
     const cleanPath = path.replace(/^\/+/, '');
     return `${baseUrl}/${cleanPath}`;
