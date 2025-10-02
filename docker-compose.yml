@@ -5,6 +5,8 @@ services:
     build: 
       context: ./pinger
       dockerfile: Dockerfile
+      args:
+        BUILDKIT_INLINE_CACHE: 1
     ports:
       - "8000:8000"
     volumes:
@@ -21,11 +23,19 @@ services:
       - db
     networks:
       - app-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
 
   frontend:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        BUILDKIT_INLINE_CACHE: 1
     ports:
       - "5173:5173"
     volumes:
@@ -37,6 +47,12 @@ services:
       - backend
     networks:
       - app-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
 
   db:
     image: postgres:16
@@ -50,6 +66,12 @@ services:
       - "5432:5432"
     networks:
       - app-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
 
 volumes:
   postgres_data:

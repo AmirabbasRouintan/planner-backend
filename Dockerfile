@@ -1,17 +1,22 @@
 FROM node:20-alpine
 
+# Set environment variables to reduce memory usage
+ENV NODE_OPTIONS="--max-old-space-size=1024"
+ENV npm_config_cache=/tmp/npm-cache
+ENV CI=true
+
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci
+# Install dependencies with optimizations
+RUN npm ci --prefer-offline --no-audit --no-fund
 
 # Copy project files
 COPY . .
 
-# Build the app
+# Build the app with memory limits
 RUN npm run build
 
 # Expose port
