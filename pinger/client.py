@@ -25,7 +25,7 @@ def get_backend_url():
     """
     Get the backend URL from environment variable or return default.
     """
-    return os.environ.get('BACKEND_URL', 'http://209.38.203.71:8000')
+    return os.environ.get('BACKEND_URL', 'http://ixiflower32.pythonanywhere.com/')
 
 class OptimizedV2RayTester:
     def __init__(self, root_tk=None):
