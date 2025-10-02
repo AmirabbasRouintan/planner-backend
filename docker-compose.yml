@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   db:
-    image: postgres:13
+    image: postgres:16
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     environment:
@@ -24,8 +24,6 @@ services:
     build: 
       context: ./pinger
       dockerfile: Dockerfile
-      args:
-        BUILDKIT_INLINE_CACHE: 1
     ports:
       - "8000:8000"
     volumes:
@@ -45,16 +43,14 @@ services:
     deploy:
       resources:
         limits:
-          memory: 768M
+          memory: 512M
         reservations:
-          memory: 384M
+          memory: 512M
 
   frontend:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        BUILDKIT_INLINE_CACHE: 1
     ports:
       - "5173:5173"
     volumes:
@@ -69,9 +65,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 768M
+          memory: 512M
         reservations:
-          memory: 384M
+          memory: 512M
 
 volumes:
   postgres_data:

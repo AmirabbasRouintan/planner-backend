@@ -1,49 +1,26 @@
-FROM node:20-alpine AS deps
+FROM node:20-alpine
 
 # Set environment variables to reduce memory usage
-ENV NODE_OPTIONS="--max-old-space-size=512"
-ENV npm_config_cache=/tmp/npm-cache
-ENV CI=true
-
-WORKDIR /app
-
-# Install dependencies with optimizations
-COPY package*.json ./
-RUN npm ci --prefer-offline --no-audit --no-fund --omit=optional
-
-# Build stage
-FROM node:20-alpine AS builder
-
-# Set environment variables
 ENV NODE_OPTIONS="--max-old-space-size=1024"
 ENV npm_config_cache=/tmp/npm-cache
 ENV CI=true
 
 WORKDIR /app
 
-# Copy dependencies
-COPY --from=deps /app/node_modules ./node_modules
+# Copy package files
 COPY package*.json ./
+
+# Install dependencies with optimizations
+RUN npm ci --prefer-offline --no-audit --no-fund
 
 # Copy project files
 COPY . .
 
+# Rebuild node modules to fix platform-specific issues
+RUN npm rebuild
+
 # Build the app with memory limits
 RUN npm run build
-
-# Production stage
-FROM node:20-alpine
-
-# Set environment variables
-ENV NODE_OPTIONS="--max-old-space-size=512"
-ENV npm_config_cache=/tmp/npm-cache
-
-WORKDIR /app
-
-# Copy built files
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/dist ./dist
 
 # Expose port
 EXPOSE 5173
