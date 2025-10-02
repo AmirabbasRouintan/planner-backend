@@ -3,13 +3,18 @@
 
 // Get backend URL from environment variable, proxy-config.json, or use default
 export function getBackendUrl(): string {
-  // In development, use the environment variable or fallback to localhost
-  if (import.meta.env.DEV) {
-    return import.meta.env.VITE_BACKEND_URL || 'https://ixiflower32.pythonanywhere.com';
+  // Use the environment variable if available
+  if (import.meta.env.VITE_BACKEND_URL) {
+    return import.meta.env.VITE_BACKEND_URL;
   }
   
-  // In production, use the current host as the backend
-  return window.location.origin;
+  // In development, fallback to pythonanywhere backend
+  if (import.meta.env.DEV) {
+    return 'https://ixiflower32.pythonanywhere.com';
+  }
+  
+  // In production, use the pythonanywhere backend
+  return 'https://ixiflower32.pythonanywhere.com';
 }
 
 // Get API base URL
