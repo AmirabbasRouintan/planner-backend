@@ -8,8 +8,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Install system dependencies with minimal footprint
-RUN apk add --no-cache postgresql-client
+# Install system dependencies including gcc for building packages
+RUN apk add --no-cache \
+    postgresql-client \
+    gcc \
+    musl-dev \
+    libffi-dev
 
 # Copy requirements and install Python dependencies with conservative memory usage
 COPY requirements.txt .
