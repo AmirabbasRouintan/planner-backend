@@ -163,7 +163,7 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
 
   const getProfileImageUrl = () => {
     if (user?.profile_picture) {
-      const baseUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+      const baseUrl = import.meta.env.VITE_BACKEND_URL || 'https://ixiflower32.pythonanywhere.com';
       const path = user.profile_picture.replace(/^\/+/, '');
       return `${baseUrl}/${path}`;
     }

@@ -59,7 +59,7 @@ services:
     networks:
       - app-network
     environment:
-      - VITE_API_URL=http://localhost:8000
+      - VITE_API_URL=https://ixiflower32.pythonanywhere.com
     deploy:
       resources:
         limits:

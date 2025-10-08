@@ -10,11 +10,11 @@ export function getBackendUrl(): string {
   
   // In development, fallback to pythonanywhere backend
   if (import.meta.env.DEV) {
-    return 'http://localhost:8000';
+    return 'https://ixiflower32.pythonanywhere.com';
   }
   
   // In production, use the pythonanywhere backend
-  return 'http://localhost:8000';
+  return 'https://ixiflower32.pythonanywhere.com';
 }
 
 // Get API base URL
