@@ -34,6 +34,8 @@ const EventCreator: React.FC<Props> = ({ selectedDate, onSave, onCancel, tempEve
   const [color, setColor] = React.useState("blue");
   const [isImportant, setIsImportant] = React.useState(false);
   const [isCreating, setIsCreating] = React.useState(false);
+  const [category, setCategory] = React.useState<string>("general");
+  const [categories, setCategories] = React.useState<string[]>(["general", "work", "personal", "education", "health"]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,6 +60,7 @@ const EventCreator: React.FC<Props> = ({ selectedDate, onSave, onCancel, tempEve
       endDate: endDate.toISOString(),
       color: color as CalendarEvent["color"],
       isImportant,
+      category,
     };
 
     console.log("EventCreator submitting event:", newEvent);
@@ -122,6 +125,34 @@ const EventCreator: React.FC<Props> = ({ selectedDate, onSave, onCancel, tempEve
             <option value="orange">Orange</option>
             <option value="gray">Gray</option>
           </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Category</label>
+          <div className="flex gap-2">
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full border rounded px-3 py-2 text-sm"
+            >
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                const newCat = window.prompt('Enter new category name:');
+                if (newCat && !categories.includes(newCat)) {
+                  setCategories([...categories, newCat]);
+                  setCategory(newCat);
+                }
+              }}
+            >
+              +
+            </Button>
+          </div>
         </div>
         
         <div className="flex items-center space-x-2">

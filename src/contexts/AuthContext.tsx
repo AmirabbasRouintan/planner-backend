@@ -7,6 +7,7 @@ interface User {
   username: string;
   profile_picture?: string;
   is_admin?: boolean;
+  is_superuser?: boolean;
   is_v2ray_admin?: boolean;
   has_v2ray_access?: boolean;
 }
@@ -71,7 +72,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(userData);
         setToken(storedToken);
         setIsAuthenticated(true);
-        const isAdminUser = userData.is_admin === true;
+        const isAdminUser = userData.is_admin === true || userData.is_superuser === true;
         setIsAdmin(isAdminUser);
         setIsV2RayAdmin(isAdminUser || userData.is_v2ray_admin === true);
         setHasV2RayAccess(userData.has_v2ray_access === true);
@@ -92,7 +93,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(userData);
     setToken(token);
     setIsAuthenticated(true);
-    const isAdminUser = userData.is_admin === true;
+    const isAdminUser = userData.is_admin === true || userData.is_superuser === true;
     setIsAdmin(isAdminUser);
     setIsV2RayAdmin(isAdminUser || userData.is_v2ray_admin === true);
     setHasV2RayAccess(userData.has_v2ray_access === true);

@@ -29,6 +29,8 @@ const EventEditor: React.FC<Props> = ({ event, onSave, onCancel, onDelete, open,
   );
   const [isImportant, setIsImportant] = React.useState(event?.isImportant || false);
   const [isSaving, setIsSaving] = React.useState(false);
+  const [category, setCategory] = React.useState<string>(event?.category || "general");
+  const [categories, setCategories] = React.useState<string[]>(["general", "work", "personal", "education", "health"]);
 
   React.useEffect(() => {
     if (event) {
@@ -66,6 +68,7 @@ const EventEditor: React.FC<Props> = ({ event, onSave, onCancel, onDelete, open,
         endDate: endDate.toISOString(),
         color,
         isImportant,
+        category,
       });
     } finally {
       setIsSaving(false);
@@ -138,6 +141,34 @@ const EventEditor: React.FC<Props> = ({ event, onSave, onCancel, onDelete, open,
                 <option value="orange">Orange</option>
                 <option value="gray">Gray</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Category</label>
+              <div className="flex gap-2">
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full border rounded px-3 py-2 text-sm"
+                >
+                  {categories.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const newCat = window.prompt('Enter new category name:');
+                    if (newCat && !categories.includes(newCat)) {
+                      setCategories([...categories, newCat]);
+                      setCategory(newCat);
+                    }
+                  }}
+                >
+                  +
+                </Button>
+              </div>
             </div>
 
             <div className="flex items-center">

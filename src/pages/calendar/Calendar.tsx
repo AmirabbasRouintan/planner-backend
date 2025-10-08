@@ -59,11 +59,21 @@ import type {
 } from "./types";
 import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import CalendarDayView from "./CalendarDayView";
+import Tasks from "./Tasks";
+import Teams from "./Teams";
 import Checklist from "./Checklist";
 import { CalendarNav } from "./CalendarNav";
 import { Goals } from "./Goals";
 import { PermanentNotes } from "./PermanentNotes";
 import { QuickNoteDialog } from "@/components/planner";
+import { PieChart, Pie, Cell } from "recharts";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from "@/components/ui/chart";
 
 function setCookie(name: string, value: string, days: number) {
   let expires = "";
@@ -180,14 +190,14 @@ const Calendar: React.FC = () => {
   const [permanentNotes, setPermanentNotes] = React.useState<PermanentNote[]>(
     []
   );
-  const [notePopupOpen, setNotePopupOpen] = React.useState(false);
+  const [notePopupOpen, setNotePopupOpen] = React.useState(false);1
   const [quickNote, setQuickNote] = React.useState("");
   const [notePreviewMode, setNotePreviewMode] = React.useState(true);
   const [pinnedItems, setPinnedItems] = React.useState<string[]>(() => {
     const saved = getCookie("pinnedItems");
     return saved ? JSON.parse(saved) : [];
-  });
-  const [isAddTemplateOpen, setIsAddTemplateOpen] = React.useState(false);
+  }); 
+  const [isAddTemplateOpen, setIsAddTemplateOpen] = React.useState(false);  
   const [templates, setTemplates] = React.useState<EventTemplate[]>([]);
   const [newTemplate, setNewTemplate] = React.useState<
     Omit<EventTemplate, "id">
@@ -195,9 +205,11 @@ const Calendar: React.FC = () => {
     name: "",
     title: "",
     color: "blue",
+    category: "general",
   });
   const [isEditTemplateOpen, setIsEditTemplateOpen] = React.useState(false);
   const [editingTemplate, setEditingTemplate] = React.useState<EventTemplate | null>(null);
+  const [templateCategories, setTemplateCategories] = React.useState<string[]>(["general", "work", "personal", "education", "health"]);
   const [dailyGoals, setDailyGoals] = React.useState<DailyGoal[]>([]);
   const [isGoalDialogOpen, setIsGoalDialogOpen] = React.useState(false);
   const [editingGoal, setEditingGoal] = React.useState<DailyGoal | null>(null);
@@ -391,14 +403,24 @@ const Calendar: React.FC = () => {
   };
 
   const handleExport = () => {
-    const dataStr = JSON.stringify(events, null, 2);
-    const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(
-      dataStr
-    )}`;
-    const exportFileDefaultName = `tasks-${format(
-      selectedDate,
-      "yyyy-MM-dd"
-    )}.txt`;
+    const payload = {
+      meta: {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+      },
+      events,
+      dailyGoals,
+      permanentNotes,
+      eventTemplates: templates,
+      pinnedItems,
+      preferences: {
+        showChecklist,
+      },
+    };
+
+    const dataStr = JSON.stringify(payload, null, 2);
+    const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(dataStr)}`;
+    const exportFileDefaultName = `planner-backup-${format(new Date(), "yyyy-MM-dd")}.json`;
 
     const linkElement = document.createElement("a");
     linkElement.setAttribute("href", dataUri);
@@ -409,7 +431,7 @@ const Calendar: React.FC = () => {
   const handleImport = () => {
     const inputElement = document.createElement("input");
     inputElement.type = "file";
-    inputElement.accept = ".json";
+    inputElement.accept = ".json,.txt";
 
     inputElement.onchange = (event) => {
       const target = event.target as HTMLInputElement;
@@ -419,12 +441,47 @@ const Calendar: React.FC = () => {
         const reader = new FileReader();
         reader.onload = (e) => {
           try {
-            const importedEvents = JSON.parse(e.target?.result as string);
-            if (Array.isArray(importedEvents)) {
-              setEvents((prevEvents) => [...prevEvents, ...importedEvents]);
+            const parsed = JSON.parse(e.target?.result as string);
+
+            // Backward compatibility: if it's an array, treat as events only
+            if (Array.isArray(parsed)) {
+              setEvents((prevEvents) => [...prevEvents, ...parsed]);
+              alert(`Imported ${parsed.length} events.`);
+              return;
             }
+
+            // Full backup format
+            if (parsed.events && Array.isArray(parsed.events)) {
+              setEvents(parsed.events);
+            }
+            if (parsed.dailyGoals && Array.isArray(parsed.dailyGoals)) {
+              setDailyGoals(parsed.dailyGoals);
+            }
+            if (parsed.permanentNotes && Array.isArray(parsed.permanentNotes)) {
+              setPermanentNotes(parsed.permanentNotes);
+            }
+            if (parsed.eventTemplates && Array.isArray(parsed.eventTemplates)) {
+              setTemplates(parsed.eventTemplates);
+            }
+            if (parsed.pinnedItems && Array.isArray(parsed.pinnedItems)) {
+              setPinnedItems(parsed.pinnedItems);
+            }
+            if (parsed.preferences && typeof parsed.preferences === "object") {
+              if (typeof parsed.preferences.showChecklist === "boolean") {
+                setShowChecklist(parsed.preferences.showChecklist);
+              }
+            }
+
+            const counts = {
+              events: parsed.events?.length || 0,
+              goals: parsed.dailyGoals?.length || 0,
+              notes: parsed.permanentNotes?.length || 0,
+              templates: parsed.eventTemplates?.length || 0,
+            };
+            alert(`Import completed. Events: ${counts.events}, Goals: ${counts.goals}, Notes: ${counts.notes}, Templates: ${counts.templates}`);
           } catch (error) {
             console.error("Error parsing imported file:", error);
+            alert("Failed to import file. Please ensure it is a valid JSON export.");
           }
         };
         reader.readAsText(file);
@@ -452,6 +509,91 @@ const Calendar: React.FC = () => {
       console.error("Failed to save note:", error);
     }
   }, [quickNote, token]);
+
+  const handleDeleteAllData = async (password: string) => {
+    try {
+      if (!isAuthenticated || !user) {
+        alert("You must be signed in.");
+        return;
+      }
+
+      if (!password || password.length < 1) {
+        alert("Password is required.");
+        return;
+      }
+
+      // Verify password by attempting login
+      const loginResp = await fetch(`${import.meta.env.VITE_BACKEND_URL || ''}/auth/login/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email, password }),
+        credentials: "include",
+      });
+
+      if (!loginResp.ok) {
+        alert("Password incorrect. Deletion aborted.");
+        return;
+      }
+
+      // Use existing token to call delete endpoints
+      const authHeader = token && token.startsWith('Token ') ? token : `Token ${token || ''}`;
+
+      const apiBase = (import.meta.env.VITE_BACKEND_URL || '') as string;
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (authHeader.trim()) headers["Authorization"] = authHeader.trim();
+
+      // Delete by resource collections if supported; otherwise best-effort per item
+      // Tasks / Events
+      try {
+        // Attempt a bulk delete endpoint first
+        const bulkTasks = await fetch(`${apiBase}/tasks/clear/`, { method: "POST", headers, credentials: "include" });
+        if (!bulkTasks.ok) {
+          // Fallback: delete individually
+          await Promise.allSettled(events.map(ev => fetch(`${apiBase}/tasks/${ev.id}/`, { method: "DELETE", headers, credentials: "include" })));
+        }
+      } catch {}
+
+      // Notes
+      try {
+        const bulkNotes = await fetch(`${apiBase}/notes/clear/`, { method: "POST", headers, credentials: "include" });
+        if (!bulkNotes.ok) {
+          await Promise.allSettled(permanentNotes.map(n => fetch(`${apiBase}/notes/${n.id}/`, { method: "DELETE", headers, credentials: "include" })));
+        }
+      } catch {}
+
+      // Daily goals
+      try {
+        const bulkGoals = await fetch(`${apiBase}/daily-goals/clear/`, { method: "POST", headers, credentials: "include" });
+        if (!bulkGoals.ok) {
+          await Promise.allSettled(dailyGoals.map(g => fetch(`${apiBase}/daily-goals/${g.id}/`, { method: "DELETE", headers, credentials: "include" })));
+        }
+      } catch {}
+
+      // Templates
+      try {
+        const bulkTemplates = await fetch(`${apiBase}/event-templates/clear/`, { method: "POST", headers, credentials: "include" });
+        if (!bulkTemplates.ok) {
+          await Promise.allSettled(templates.map(t => fetch(`${apiBase}/event-templates/${t.id}/`, { method: "DELETE", headers, credentials: "include" })));
+        }
+      } catch {}
+
+      // Clear local state
+      setEvents([]);
+      setPermanentNotes([]);
+      setDailyGoals([]);
+      setTemplates([]);
+      setPinnedItems([]);
+      setShowChecklist(false);
+
+      alert("All your planner data has been deleted.");
+    } catch (e) {
+      console.error("Delete all data failed:", e);
+      alert("Failed to delete all data. Please try again.");
+    }
+  };
 
   const applyFormatting = React.useCallback(
     (prefix: string, suffix: string) => {
@@ -505,6 +647,50 @@ const Calendar: React.FC = () => {
 
   const importantEvents = todayEvents.filter((event) => event.isImportant);
 
+  const donutPalette = React.useMemo(
+    () => [
+      "#7C3AED", // violet-600
+      "#3B82F6", // blue-500
+      "#10B981", // emerald-500
+      "#F59E0B", // amber-500
+      "#EC4899", // pink-500
+      "#06B6D4", // cyan-500
+      "#EF4444", // red-500
+      "#F97316", // orange-500
+      "#14B8A6", // teal-500
+      "#8B5CF6", // violet-500
+    ],
+    []
+  );
+
+  const hoursData = React.useMemo(() => {
+    const data = todayEvents.map((event) => {
+      const start = parseISO(event.startDate).getTime();
+      const end = parseISO(event.endDate).getTime();
+      const hours = Math.max((end - start) / (1000 * 60 * 60), 0);
+      return {
+        name: event.title,
+        value: Number(hours.toFixed(2)),
+        fill: event.color,
+      };
+    });
+    const filtered = data.filter((d) => d.value > 0);
+    return filtered.map((d, i) => ({ ...d, fill: donutPalette[i % donutPalette.length] }));
+  }, [todayEvents, donutPalette]);
+
+  const totalHours = React.useMemo(
+    () => hoursData.reduce((sum, d) => sum + d.value, 0),
+    [hoursData]
+  );
+
+  const chartConfig = React.useMemo(
+    () =>
+      Object.fromEntries(
+        hoursData.map((d) => [d.name, { label: d.name }])
+      ),
+    [hoursData]
+  );
+
   return (
     <div className="min-h-screen mb-20 bg-background">
       <CalendarNav
@@ -521,6 +707,7 @@ const Calendar: React.FC = () => {
         saveAllAndRefresh={saveAllAndRefresh}
         handleImport={handleImport}
         handleExport={handleExport}
+        handleDeleteAllData={handleDeleteAllData}
         events={events}
         todayEvents={todayEvents}
         importantEvents={importantEvents}
@@ -537,18 +724,24 @@ const Calendar: React.FC = () => {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Main Content */}
         <div className="flex flex-1 gap-4 md:gap-6 flex-col xl:flex-row">
-          {/* Calendar View */}
+          {/* Main Panel: switch by activeSection */}
           <div className="flex-1">
-            <Card className="shadow-lg border border-border bg-[var(--calendar-date-bg)] backdrop-blur overflow-hidden">
-              <CardContent className="py-2 pl-2 pr-0">
-                <CalendarDayView
-                  selectedDate={selectedDate}
-                  events={events}
-                  setEvents={setEvents}
-                  token={token || undefined}
-                />
-              </CardContent>
-            </Card>
+            {activeSection === "tasks" ? (
+              <Tasks />
+            ) : activeSection === "teams" ? (
+              <Teams />
+            ) : (
+              <Card className="shadow-lg border border-border bg-[var(--calendar-date-bg)] backdrop-blur overflow-hidden">
+                <CardContent className="py-2 pl-2 pr-0">
+                  <CalendarDayView
+                    selectedDate={selectedDate}
+                    events={events}
+                    setEvents={setEvents}
+                    token={token || undefined}
+                  />
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Sidebar */}
@@ -877,6 +1070,35 @@ const Calendar: React.FC = () => {
               />
             </div>
             <div className="space-y-2">
+              <label htmlFor="template-category" className="text-sm font-medium">
+                Category
+              </label>
+              <div className="flex gap-2">
+                <select
+                  id="template-category"
+                  value={newTemplate.category}
+                  onChange={(e) => setNewTemplate((prev) => ({ ...prev, category: e.target.value }))}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  {templateCategories.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const newCat = window.prompt('Enter new category name:');
+                    if (newCat && !templateCategories.includes(newCat)) {
+                      setTemplateCategories((prev) => [...prev, newCat]);
+                      setNewTemplate((prev) => ({ ...prev, category: newCat }));
+                    }
+                  }}
+                >
+                  +
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
               <label className="text-sm font-medium">Default Color</label>
               <div className="flex gap-2 pt-2">
                 {(Object.keys(colorMap) as CalendarColor[]).map((color) => (
@@ -941,6 +1163,35 @@ const Calendar: React.FC = () => {
                 }
                 placeholder="Default event title"
               />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="edit-template-category" className="text-sm font-medium">
+                Category
+              </label>
+              <div className="flex gap-2">
+                <select
+                  id="edit-template-category"
+                  value={editingTemplate?.category || "general"}
+                  onChange={(e) => setEditingTemplate((prev) => (prev ? { ...prev, category: e.target.value } : prev))}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  {templateCategories.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const newCat = window.prompt('Enter new category name:');
+                    if (newCat && !templateCategories.includes(newCat)) {
+                      setTemplateCategories((prev) => [...prev, newCat]);
+                      setEditingTemplate((prev) => (prev ? { ...prev, category: newCat } : prev));
+                    }
+                  }}
+                >
+                  +
+                </Button>
+              </div>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Default Color</label>
@@ -1057,6 +1308,48 @@ const Calendar: React.FC = () => {
             </div>
 
             <Separator className="bg-border" />
+
+            {/* Donut Chart: Hours by Task (Today) */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-foreground">
+                  Hours by Task (Today)
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Total: {totalHours.toFixed(2)}h
+                </p>
+              </div>
+              <Card className="border border-border bg-[var(--calendar-date-bg)]">
+                <CardContent className="p-4">
+                  {hoursData.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No time logged for today.</p>
+                  ) : (
+                    <ChartContainer config={chartConfig} className="aspect-[2/1]">
+                      <PieChart>
+                        <Pie
+                          data={hoursData}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius={60}
+                          outerRadius={90}
+                          strokeWidth={2}
+                          isAnimationActive={false}
+                        >
+                          {hoursData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                          ))}
+                        </Pie>
+                        <ChartTooltip
+                          cursor={false}
+                          content={<ChartTooltipContent hideLabel />}
+                        />
+                        <ChartLegend content={<ChartLegendContent />} />
+                      </PieChart>
+                    </ChartContainer>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
 
             {/* Events List with Show More */}
             <div className="space-y-4">

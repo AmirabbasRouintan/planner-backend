@@ -724,7 +724,7 @@ export default function Planner() {
   };
 
   return (
-    <div className="flex flex-col items-center min-h-screen w-full p-3 sm:p-4 gap-3 sm:gap-4 pb-20 md:pb-16">
+    <div className="flex flex-col items-center min-h-screen w-full bg-background text-foreground p-3 sm:p-4 gap-3 sm:gap-4 pb-20 md:pb-16">
       <div className="w-full max-w-7xl">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div>

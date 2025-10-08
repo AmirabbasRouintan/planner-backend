@@ -26,7 +26,8 @@ const DroppableHourSlot: React.FC<{
   children: React.ReactNode;
   onDoubleClick: (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => void;
   handleCreateEvent: (event: CalendarEvent) => Promise<void>;
-}> = ({ hour, selectedDate, setEvents, children, onDoubleClick, handleCreateEvent }) => {
+  onMoveExisting: (id: string, newStart: string, newEnd: string, saveImmediately?: boolean) => void;
+}> = ({ hour, selectedDate, setEvents, children, onDoubleClick, handleCreateEvent, onMoveExisting }) => {
   const ref = React.useRef<HTMLDivElement | null>(null);
   const [isDraggedOver, setIsDraggedOver] = React.useState(false);
 
@@ -40,23 +41,38 @@ const DroppableHourSlot: React.FC<{
       onDragEnter: () => setIsDraggedOver(true),
       onDragLeave: () => setIsDraggedOver(false),
       onDrop: ({ source }) => {
-        const { template } = source.data as { template: EventTemplate };
-        if (!template) return;
-
+        const data = source.data as any;
         const startDate = startOfHour(setHours(selectedDate, hour));
         const endDate = addHours(startDate, 1);
 
-        const newEvent: CalendarEvent = {
-          id: `temp-${Date.now()}`,
-          title: template.title,
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString(),
-          color: template.color,
-          isImportant: false,
-          description: "",
-        };
+        // Drop from template palette
+        if (data && (data as { template?: EventTemplate }).template) {
+          const { template } = data as { template: EventTemplate };
+          const newEvent: CalendarEvent = {
+            id: `temp-${Date.now()}`,
+            title: template.title,
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+            color: template.color,
+            isImportant: false,
+            description: "",
+          };
+          handleCreateEvent(newEvent);
+          setIsDraggedOver(false);
+          return;
+        }
 
-        handleCreateEvent(newEvent);
+        // Move existing event block
+        if (data && data.type === 'event' && data.event) {
+          const { event, durationMs } = data as { type: string; event: CalendarEvent; durationMs: number };
+          const newStart = startDate.toISOString();
+          const newEnd = new Date(startDate.getTime() + (durationMs ?? (parseISO(event.endDate).getTime() - parseISO(event.startDate).getTime()))).toISOString();
+          // Save immediately for mobile drop
+          onMoveExisting(event.id, newStart, newEnd, true);
+          setIsDraggedOver(false);
+          return;
+        }
+
         setIsDraggedOver(false);
       },
     });
@@ -261,7 +277,8 @@ const CalendarDayView: React.FC<Props> = ({
   const handleMoveEvent = (
     id: string,
     newStartDate: string,
-    newEndDate: string
+    newEndDate: string,
+    saveImmediately: boolean = false
   ) => {
     setDraggingEventId(id);
     moveEvent(id, newStartDate, newEndDate);
@@ -270,9 +287,13 @@ const CalendarDayView: React.FC<Props> = ({
       clearTimeout(moveTimeoutRef.current);
     }
 
-    moveTimeoutRef.current = setTimeout(async () => {
-      await saveMovedEvent(id, newStartDate, newEndDate);
-    }, 200);
+    if (saveImmediately) {
+      void saveMovedEvent(id, newStartDate, newEndDate);
+    } else {
+      moveTimeoutRef.current = setTimeout(async () => {
+        await saveMovedEvent(id, newStartDate, newEndDate);
+      }, 200);
+    }
   };
 
   const saveMovedEvent = async (
@@ -499,6 +520,7 @@ const CalendarDayView: React.FC<Props> = ({
                 selectedDate={selectedDate}
                 setEvents={setEvents}
                 handleCreateEvent={handleCreateEvent}
+              onMoveExisting={handleMoveEvent}
                 onDoubleClick={(e) => {
                   if (e.target === e.currentTarget) {
                     const rect = e.currentTarget.getBoundingClientRect();

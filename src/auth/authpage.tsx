@@ -188,7 +188,7 @@ export default function AuthPage() {
       const endpoint = isSignIn ? "/auth/login/" : "/auth/register/";
       
       const submitData = isSignIn 
-        ? { email: formData.email, password: formData.password }
+        ? { username: formData.email, password: formData.password }
         : { 
             email: formData.email, 
             password: formData.password,

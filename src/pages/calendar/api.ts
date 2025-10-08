@@ -314,7 +314,7 @@ export const updateEventTemplate = async (template: EventTemplate, token?: strin
     method: "PUT",
     headers,
     credentials: "include",
-    body: JSON.stringify({ name: template.name, title: template.title, color: template.color }),
+    body: JSON.stringify({ name: template.name, title: template.title, color: template.color, category: template.category }),
   });
   if (!response.ok) throw new Error("Failed to update event template");
   return response.json();

@@ -102,6 +102,7 @@ interface CalendarNavProps {
   saveAllAndRefresh: () => Promise<void>;
   handleImport: () => void;
   handleExport: () => void;
+  handleDeleteAllData: (password: string) => Promise<void>;
   events: CalendarEvent[];
   todayEvents: CalendarEvent[];
   importantEvents: CalendarEvent[];
@@ -128,6 +129,7 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
   saveAllAndRefresh,
   handleImport,
   handleExport,
+  handleDeleteAllData,
   events,
   todayEvents,
   importantEvents,
@@ -139,6 +141,8 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
   const [rightOpen, setRightOpen] = React.useState(false);
   const [isTelegramDialogOpen, setIsTelegramDialogOpen] = React.useState(false);
   const [telegramUsername, setTelegramUsername] = React.useState("");
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
+  const [deletePassword, setDeletePassword] = React.useState("");
 
   const navItems = [
     { id: "calendar", label: "Calendar", icon: CalendarIcon },
@@ -159,7 +163,7 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
 
   const getProfileImageUrl = () => {
     if (user?.profile_picture) {
-      const baseUrl = import.meta.env.VITE_BACKEND_URL || 'https://ixiflower32.pythonanywhere.com';
+      const baseUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
       const path = user.profile_picture.replace(/^\/+/, '');
       return `${baseUrl}/${path}`;
     }
@@ -801,6 +805,14 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
                         <Download className="mr-2 h-4 w-4" />
                         <span>Export</span>
                       </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => setIsDeleteDialogOpen(true)}
+                      >
+                        <Archive className="mr-2 h-4 w-4" />
+                        <span>Delete all data…</span>
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                   <Button
@@ -873,6 +885,47 @@ export const CalendarNav: React.FC<CalendarNavProps> = ({
               }}
             >
               Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete all data</DialogTitle>
+            <DialogDescription>
+              This will permanently remove all your planner data (events, tasks, goals, templates, notes) from your account. Enter your account password to confirm.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="delete-password" className="text-right">
+                Password
+              </Label>
+              <Input
+                id="delete-password"
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                className="col-span-3"
+                placeholder="Enter your password"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                const pwd = deletePassword;
+                setDeletePassword("");
+                setIsDeleteDialogOpen(false);
+                await handleDeleteAllData(pwd);
+              }}
+            >
+              Permanently delete
             </Button>
           </DialogFooter>
         </DialogContent>

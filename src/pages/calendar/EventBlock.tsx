@@ -7,6 +7,7 @@ import {
   TooltipTrigger
 } from "@/components/ui/tooltip";
 import type { CalendarEvent } from "./types";
+import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 
 interface Props {
   event: CalendarEvent;
@@ -54,6 +55,7 @@ const EventBlock: React.FC<Props> = React.memo(
     const [isTouchDragging, setIsTouchDragging] = React.useState(false);
     const [longPressProgress, setLongPressProgress] = React.useState(0);
     const blockRef = React.useRef<HTMLDivElement | null>(null);
+    const [isPddDragging, setIsPddDragging] = React.useState(false);
 
     const colorClasses = {
       blue: "bg-blue-100 border-blue-200 text-blue-800",
@@ -424,6 +426,26 @@ const EventBlock: React.FC<Props> = React.memo(
       onDelete(event.id);
     };
 
+    // Enable pragmatic-drag-and-drop for touch/coarse pointers (mobile)
+    React.useEffect(() => {
+      const el = blockRef.current;
+      if (!el) return;
+
+      const isCoarsePointer = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+      if (!isCoarsePointer) return;
+
+      return draggable({
+        element: el,
+        getInitialData: () => ({
+          type: "event",
+          event,
+          durationMs: parseISO(event.endDate).getTime() - parseISO(event.startDate).getTime(),
+        }),
+        onDragStart: () => setIsPddDragging(true),
+        onDrop: () => setIsPddDragging(false),
+      });
+    }, [event]);
+
     return (
       <Tooltip>
         <TooltipTrigger asChild>
@@ -431,13 +453,13 @@ const EventBlock: React.FC<Props> = React.memo(
             ref={blockRef}
             className={`absolute rounded-sm border px-0.5 py-0.5 text-xs truncate cursor-move select-none event-block ${
               colorClasses[event.color]
-            } ${isTouchDragging ? "shadow-lg scale-105" : ""}`}
+            } ${(isTouchDragging || isPddDragging) ? "shadow-lg scale-105" : ""}`}
             style={{
               height: `${heightInPixels}px`,
               top: `${(start.getMinutes() / 60) * 48}px`,
               left: `${position.left}%`,
               width: `${position.width}%`,
-              zIndex: isDraggingId === event.id || isTouchDragging ? 50 : 10,
+              zIndex: isDraggingId === event.id || isTouchDragging || isPddDragging ? 50 : 10,
               transition: 'all 0.2s ease-in-out'
             }}
             onMouseDown={handleSwipeStart}

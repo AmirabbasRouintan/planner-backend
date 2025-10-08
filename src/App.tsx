@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Navbar from "@/components/navbar";
+import Lightning from "@/components/Lightning";
 import Home from "@/pages/home";
 import AuthPage from "@/auth/authpage";
 import Planner from "@/pages/planner";
@@ -13,8 +14,10 @@ function App() {
   return (
     <AuthProvider>
       <Router>
-        <div>
-          <Routes>
+        <div className="relative min-h-screen">
+          <Lightning hue={220} xOffset={0} speed={1} intensity={1} size={1} />
+          <div style={{ position: "relative" }}>
+            <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/home" element={<Home />} />
             <Route path="/planner" element={<Planner />} />
@@ -23,8 +26,9 @@ function App() {
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/v2ray" element={<V2Ray />} />
             <Route path="*" element={<NotFound />} />
-          </Routes>
-          <Navbar />
+            </Routes>
+            <Navbar />
+          </div>
         </div>
       </Router>
     </AuthProvider>

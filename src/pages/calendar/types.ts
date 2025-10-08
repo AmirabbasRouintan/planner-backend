@@ -8,6 +8,7 @@ export interface CalendarEvent {
   endDate: string;
   color: CalendarColor;
   isImportant?: boolean;
+  category?: string;
 }
 
 export const initialEvents: CalendarEvent[] = [];
@@ -17,6 +18,7 @@ export interface EventTemplate {
   name: string;
   title: string;
   color: CalendarColor;
+  category?: string;
 }
 
 export interface PermanentNote {
